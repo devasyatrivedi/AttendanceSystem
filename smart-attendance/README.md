@@ -2,52 +2,99 @@
 
 A complete Smart Attendance web application utilizing **NodeJS**, **Express**, **PostgreSQL**, **AngularJS**, and **Python (OpenCV & face_recognition)**.
 
-## Project Setup Instructions
+🌐 **Live Demo**: [Deployed on Render](https://smart-attendance.onrender.com) _(URL will update after deployment)_
 
-### 1. PostgreSQL Setup
-Create your database and run the schema script:
-\`\`\`bash
+---
+
+## Quick Start (Local Development)
+
+### 1. Clone & Install
+```bash
+git clone https://github.com/YOUR_USERNAME/smart-attendance.git
+cd smart-attendance
+npm install
+```
+
+### 2. Configure Environment
+```bash
+cp .env.example .env
+# Edit .env with your values (database URL, JWT secret, email credentials)
+```
+
+### 3. Database Setup
+**Option A — Cloud (Neon, recommended):**
+1. Create a free database at [neon.tech](https://neon.tech)
+2. Run `database/schema.sql` in the Neon SQL Editor
+3. Set `DATABASE_URL` in your `.env`
+
+**Option B — Local PostgreSQL:**
+```bash
 createdb attendance_db
 psql -d attendance_db -f database/schema.sql
-\`\`\`
+# Set DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD in .env
+```
 
-### 2. Anaconda Setup
-Set up the python environment with necessary libraries:
-\`\`\`bash
+### 4. Python Environment (for Face Recognition)
+```bash
 conda create -n attendance_env python=3.9
 conda activate attendance_env
 pip install face_recognition opencv-python numpy
-\`\`\`
+```
 
-### 3. NodeJS Setup
-Install dependencies and configure:
-\`\`\`bash
-npm install
-cp .env.example .env  # fill in your values
+### 5. Run
+```bash
 node server.js
-\`\`\`
+# Visit http://localhost:3000
+```
 
-*(Ensure that the `.env` file corresponds closely to the provided configurations in the project root)*
+---
 
-### 4. First Use
-1. **Register a student with a photo** on the Student Portal (`/student/register.html`).
-2. **Train faces:** run the Node script manually or the server will auto-trigger it on upload.
-   \`\`\`bash
+## Cloud Deployment (Render + Neon)
+
+This app is deployed for free using:
+- **[Render](https://render.com)** — Node.js backend hosting (free tier)
+- **[Neon](https://neon.tech)** — Serverless PostgreSQL (free forever)
+
+### Deploy Your Own
+1. Fork this repo
+2. Create a Neon database and run `database/schema.sql`
+3. On Render, create a **Web Service** connected to your GitHub repo
+4. Set environment variables in Render dashboard:
+   - `DATABASE_URL` = Neon connection string
+   - `JWT_SECRET` = any strong random string
+   - `EMAIL_USER` = Gmail address
+   - `EMAIL_PASS` = Gmail App Password
+   - `NODE_ENV` = production
+5. Build command: `npm install` | Start command: `npm start`
+
+> **Note:** Face recognition requires a local webcam + Python. It works when running locally but is unavailable in cloud deployment. All other features (manual attendance, dashboards, email alerts) work perfectly.
+
+---
+
+## Features
+- Fully error-handled API endpoints
+- Safe and secure JWT authentication
+- Multer automated photo uploads to directory
+- Deep integration between Node backend and Python ML script
+- Responsive, aesthetic UI with Glassmorphism + CDN AngularJS
+- Automated email notification rules via Nodemailer
+- Real-time attendance updates via Socket.IO
+
+## Default Test Credentials
+- **Teacher**: `teacher@test.com` / `password123`
+- **Student**: Register a new student to test
+
+## First Use
+1. **Register a student with a photo** on the Student Portal (`/student/register.html`)
+2. **Train faces** (locally):
+   ```bash
    node -e "require('./controllers/attendanceController').trainFaces()"
-   \`\`\`
-3. **Start attendance** from the Teacher Dashboard (`/teacher/attendance.html`) and view automatic recognition output. Save to database after processing!
+   ```
+3. **Start attendance** from the Teacher Dashboard (`/teacher/attendance.html`)
 
-## Features included
-- Fully error handled API endpoints
-- Safe and secure JWT authentication.
-- Multer automated photo uploads to directory.
-- Deep integration between Node backend and Python ML script.
-- Responsive, aesthetic UI with Glassmorphism implemented using purely CDN AngularJS and custom styles.
-- Automated email notification rules via Nodemailer.
+---
 
 ## Syllabus Topics Unified in Project
-
-Here are the topics from the official syllabus that have been implemented in this project:
 
 - **Unit 1**: CSS rules/selectors, Responsive design, JavaScript syntax, Error Handling, Event handling, DOM, AJAX.
 - **Unit 2 & 3**: MVC Architecture, Data binding, Controllers, $scope object, Built-in Filters, Built-in services ($http, $window), Modules, and Directives (ng-repeat, ng-show, ng-hide, ng-click).
