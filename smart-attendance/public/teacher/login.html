@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en" ng-app="teacherApp">
+<head>
+  <meta charset="UTF-8">
+  <title>Administrator Login | FleetFlow</title>
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.8.2/angular.min.js"></script>
+</head>
+<body class="auth-container">
+  
+  <div class="auth-card" ng-controller="LoginCtrl">
+    <div style="text-align: center; margin-bottom: 1.5rem; color: var(--primary); font-size: 2rem;">
+        <i class="fas fa-user-shield"></i>
+    </div>
+    <h2 class="auth-title">Admin Login</h2>
+    <p class="auth-subtitle">Authenticate to access platform tools</p>
+
+    <div class="alert badge-red" style="margin-bottom: 1.5rem; padding: 1rem; width: 100%;" ng-if="error">{{error}}</div>
+
+    <form ng-submit="login()">
+      <div class="form-group">
+        <label>Email ID</label>
+        <input type="email" ng-model="credentials.email" class="form-control" placeholder="teacher@test.com" required>
+      </div>
+      <div class="form-group">
+        <label>Password</label>
+        <input type="password" ng-model="credentials.password" class="form-control" placeholder="••••••••••" required>
+      </div>
+      
+      <button type="submit" class="btn btn-primary btn-block" style="margin-top: 1rem;" ng-disabled="loading">
+        {{loading ? 'Authenticating...' : 'Login'}}
+      </button>
+    </form>
+    
+    <div style="margin-top: 1.5rem; text-align: center;">
+      <a href="../index.html" style="color: var(--text-muted); font-size: 0.85rem; text-decoration: none;"><i class="fas fa-arrow-left"></i> Back to Home</a>
+    </div>
+  </div>
+
+  <script>
+    angular.module('teacherApp', [])
+    .controller('LoginCtrl', function($scope, $http, $window) {
+      $scope.credentials = {};
+      $scope.login = function() {
+        $scope.loading = true; $scope.error = null;
+        $http.post('/api/auth/teacher/login', $scope.credentials).then(res => {
+          $window.localStorage.setItem('teacherToken', res.data.data.token);
+          $window.localStorage.setItem('teacherName', res.data.data.name);
+          $window.location.href = 'dashboard.html';
+        }).catch(err => {
+          $scope.error = err.data.message || 'Authentication rejected';
+        }).finally(() => $scope.loading = false);
+      };
+    });
+  </script>
+</body>
+</html>

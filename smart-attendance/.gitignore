@@ -1,0 +1,8 @@
+node_modules/
+.env
+python/dataset/*.jpg
+python/dataset/*.png
+python/dataset/*.jpeg
+python/encodings.pkl
+tmp_db_check.js
+tunnel_output.txt

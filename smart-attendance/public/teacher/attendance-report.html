@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en" ng-app="teacherApp">
+<head>
+  <meta charset="UTF-8">
+  <title>Intelligence Report | FleetFlow Platform</title>
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.8.2/angular.min.js"></script>
+</head>
+<body ng-controller="ReportCtrl">
+
+  <aside class="sidebar">
+    <a href="dashboard.html" class="sidebar-logo"><i class="fas fa-layer-group"></i> Teacher's Dashboard</a>
+    <nav class="nav-menu">
+      <a href="dashboard.html" class="nav-item"><i class="fas fa-chart-pie"></i> Executive Overview</a>
+      <a href="students.html" class="nav-item"><i class="fas fa-address-book"></i> Registry</a>
+      <a href="attendance.html" class="nav-item"><i class="fas fa-expand-arrows-alt"></i> Command Center</a>
+      <a href="manual-attendance.html" class="nav-item"><i class="fas fa-tasks"></i> Operations</a>
+      <a href="attendance-report.html" class="nav-item active"><i class="fas fa-database"></i> Intelligence</a>
+      <a href="email.html" class="nav-item"><i class="fas fa-satellite-dish"></i> Smart Alerts</a>
+    </nav>
+  </aside>
+
+  <main class="main-wrapper">
+    <div class="page-header" style="margin-bottom: 2.5rem;">
+      <div>
+        <h1 class="page-title">Intelligence Logs</h1>
+        <p class="page-subtitle">Historical records and operational data queries.</p>
+      </div>
+    </div>
+
+    <div class="content-box">
+      <div class="box-header">
+        <div class="box-title">QUERY PARAMETERS</div>
+        <button class="btn btn-outline" style="padding: 0.3rem 1rem; border-radius: 8px; font-size: 0.85rem;" ng-click="toggleEdit()">
+          <i class="fas fa-pen" style="margin-right: 0.3rem;"></i> {{editMode ? 'Lock Records' : 'Unlock Records'}}
+        </button>
+      </div>
+      <div style="padding: 1.5rem;">
+        <div style="display: grid; grid-template-columns: 2fr 1fr auto; gap: 1.5rem; align-items: flex-end;">
+          <div class="form-group" style="margin: 0;">
+            <label>Designation Filter</label>
+            <select ng-model="filters.subject_id" class="form-control" ng-options="s.subject_id as s.name for s in subjects"></select>
+          </div>
+          <div class="form-group" style="margin: 0;">
+            <label>Temporal Anchor (Date)</label>
+            <input type="date" ng-model="filters.date" class="form-control">
+          </div>
+          <button class="btn btn-primary" style="height: 42px;" ng-click="loadReport()">
+            <i class="fas fa-search"></i> Execute Query
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="content-box" ng-if="reportData.length > 0">
+      <div class="box-header" ng-if="editMode" style="background: rgba(245, 158, 11, 0.1); border-bottom: 1px solid rgba(245, 158, 11, 0.3);">
+        <div class="box-title" style="color: var(--warning);"><i class="fas fa-exclamation-triangle"></i> OVERRIDE MODE ENGAGED</div>
+        <button class="btn btn-primary" style="padding: 0.25rem 1rem; border-radius: 6px; font-size: 0.8rem;" ng-click="saveChanges()">
+          Commit Modifications
+        </button>
+      </div>
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>ID TAG</th>
+              <th>ASSET NAME</th>
+              <th style="text-align: center;">LOGGED STATUS</th>
+              <th>ORIGIN NODE</th>
+              <th style="text-align: right;" ng-if="editMode">MANUAL OVERRIDE</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr ng-repeat="r in reportData">
+              <td style="color: var(--primary); font-weight: 600;">{{r.enrollment}}</td>
+              <td style="font-weight: 600; color: white;">{{r.name}}</td>
+              <td style="text-align: center;">
+                <span class="badge" ng-class="r.status === 'Present' ? 'badge-green' : 'badge-red'">{{r.status}}</span>
+              </td>
+              <td style="color: var(--text-muted); font-size: 0.85rem;"><i class="fas fa-terminal" style="margin-right:0.3rem;"></i>{{r.marked_by | uppercase}}</td>
+              <td style="text-align: right;" ng-if="editMode">
+                <button class="btn btn-outline" style="padding: 0.2rem 0.5rem; font-size: 0.75rem; border-color: rgba(255,255,255,0.2);" ng-click="toggleStatus(r)">
+                  Invert Status
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="content-box" ng-if="reportData && reportData.length === 0">
+      <div style="padding: 4rem; text-align: center; color: var(--text-muted);">
+        <i class="fas fa-database" style="font-size: 3rem; margin-bottom: 1rem; opacity: 0.3;"></i>
+        <p>0 records returned for active query constraints.</p>
+      </div>
+    </div>
+
+  </main>
+
+  <script>
+    angular.module('teacherApp', [])
+    .controller('ReportCtrl', function($scope, $http, $window, $filter) {
+      const token = $window.localStorage.getItem('teacherToken');
+      if (!token) $window.location.href = 'login.html';
+      $http.defaults.headers.common['Authorization'] = 'Bearer ' + token;
+
+      const urlParams = new URLSearchParams(window.location.search);
+      $scope.filters = {
+        subject_id: urlParams.get('subject_id') ? parseInt(urlParams.get('subject_id')) : null,
+        date: urlParams.get('date') ? new Date(urlParams.get('date')) : new Date()
+      };
+
+      $http.get('/api/teacher/subjects').then(res => $scope.subjects = res.data.data);
+
+      $scope.loadReport = () => {
+        if(!$scope.filters.subject_id) return;
+        const d = $filter('date')($scope.filters.date, 'yyyy-MM-dd');
+        $http.get('/api/teacher/attendance-report', { params: { subject_id: $scope.filters.subject_id, date: d } })
+          .then(res => $scope.reportData = res.data.data);
+      };
+
+      $scope.toggleEdit = () => { $scope.editMode = !$scope.editMode; };
+      $scope.toggleStatus = (r) => { r.status = r.status === 'Present' ? 'Absent' : 'Present'; r.dirty = true; };
+      
+      $scope.saveChanges = () => {
+        const dirtyRecords = $scope.reportData.filter(r => r.dirty);
+        if (dirtyRecords.length === 0) return alert("No modifications detected.");
+        
+        const d = $filter('date')($scope.filters.date, 'yyyy-MM-dd');
+        const promises = dirtyRecords.map(r => {
+            return $http.post('/api/teacher/attendance/manual', {
+                subject_id: $scope.filters.subject_id,
+                date: d,
+                attendance_list: [{ enrollment: r.enrollment, status: r.status }]
+            });
+        });
+
+        Promise.all(promises).then(() => {
+            alert("Database synchronized with modifications.");
+            $scope.editMode = false;
+            $scope.loadReport();
+        });
+      };
+
+      if ($scope.filters.subject_id) $scope.loadReport();
+    });
+  </script>
+</body>
+</html>

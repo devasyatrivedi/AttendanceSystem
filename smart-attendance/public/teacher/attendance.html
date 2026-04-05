@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<html lang="en" ng-app="teacherApp">
+<head>
+  <meta charset="UTF-8">
+  <title>Face Attendance | Teacher's Dashboard</title>
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.8.2/angular.min.js"></script>
+  <script src="/socket.io/socket.io.js"></script>
+  <style>
+    .config-card {
+        background: white;
+        padding: 2rem;
+        border-radius: 16px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.02);
+        border: 1px solid #f1f5f9;
+        margin-bottom: 2rem;
+    }
+    .monitor-section {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 1.5rem;
+        margin-bottom: 3rem;
+    }
+    .video-monitor {
+        width: 600px;
+        height: 380px;
+        background: #0f172a;
+        border-radius: 12px;
+        overflow: hidden;
+        position: relative;
+        box-shadow: 0 10px 40px rgba(15, 23, 42, 0.2);
+    }
+    .scanner-overlay {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        z-index: 5;
+    }
+    .scan-line {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 2px;
+        background: linear-gradient(90deg, transparent, #6366f1, transparent);
+        box-shadow: 0 0 15px #6366f1;
+        animation: scan 3s linear infinite;
+        z-index: 6;
+        opacity: 0.3;
+    }
+    @keyframes scan {
+        0% { top: 0; }
+        100% { top: 100%; }
+    }
+    .verify-card {
+        background: white;
+        padding: 0;
+        border-radius: 16px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.02);
+        border: 1px solid #f1f5f9;
+        overflow: hidden;
+    }
+    /* Custom Datepicker Ported from Manual Attendance */
+    .datepicker-container { position: relative; }
+    .datepicker-input { 
+        background: #ffffff; border: 1px solid #e5e7eb; color: #111827;
+        padding: 0.85rem 1.25rem; border-radius: 10px; width: 100%; cursor: pointer;
+        font-size: 0.95rem; display: flex; justify-content: space-between; align-items: center;
+        font-weight: 600;
+        transition: all 0.2s;
+    }
+    .datepicker-input:hover { border-color: #6366f1; background: #fff; }
+    .datepicker-dropdown {
+        position: absolute; top: calc(100% + 5px); left: 0; background: #ffffff;
+        border-radius: 12px; box-shadow: 0 10px 40px -10px rgba(0,0,0,0.15);
+        border: 1px solid #f3f4f6; width: 320px; padding: 1.5rem; z-index: 1000;
+        cursor: default;
+    }
+    .cal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
+    .cal-btn { background: #f3f4f6; border: none; border-radius: 8px; width: 32px; height: 32px; color: #4b5563; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background 0.2s; }
+    .cal-month { font-size: 1.05rem; font-weight: 800; color: #111827; text-align: center; }
+    .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+    .cal-day-header { text-align: center; font-size: 0.75rem; font-weight: 700; color: #6b7280; padding-bottom: 0.5rem; text-transform: uppercase; }
+    .cal-day { height: 38px; display: flex; align-items: center; justify-content: center; border-radius: 8px; font-weight: 700; font-size: 0.85rem; background: #f9fafb; color: #9ca3af; cursor: pointer; transition: all 0.2s; }
+    .cal-day:hover:not(.empty) { background: #eef2ff; color: #4f46e5; }
+    .cal-day.empty { visibility: hidden; }
+    .cal-day.selected { background: #6366f1; color: #ffffff; }
+    .verify-header {
+        padding: 1.5rem 2rem;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        border-bottom: 1px solid #f1f5f9;
+    }
+    .section-title {
+        font-size: 0.75rem;
+        font-weight: 800;
+        color: #94a3b8;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+    }
+    .attendance-table th {
+        background: #f8fafc;
+        padding: 1.25rem 2rem;
+        font-weight: 700;
+        color: #64748b;
+        text-transform: uppercase;
+        font-size: 0.7rem;
+        letter-spacing: 0.05em;
+        border-bottom: 1px solid #f1f5f9;
+    }
+    .attendance-table td {
+        padding: 1.25rem 2rem;
+        border-bottom: 1px solid #f8fafc;
+    }
+    .status-badge {
+        padding: 0.25rem 0.75rem;
+        border-radius: 6px;
+        font-size: 0.75rem;
+        font-weight: 700;
+        text-transform: uppercase;
+    }
+    .status-present { background: #ecfdf5; color: #10b981; }
+    .status-absent { background: #fef2f2; color: #ef4444; }
+
+    /* Professional 'Glassmorphism' Notifications */
+    .toast-container { 
+        position: fixed !important; top: 2rem !important; left: 20rem !important; z-index: 2000000 !important;
+        display: flex; flex-direction: column; gap: 1.5rem; 
+        pointer-events: none;
+    }
+    .toast {
+        pointer-events: auto;
+        background: rgba(255, 255, 255, 0.85); 
+        backdrop-filter: blur(15px);
+        -webkit-backdrop-filter: blur(15px);
+        color: #1e293b; padding: 2.5rem 3.5rem;
+        border-radius: 28px; 
+        box-shadow: 0 40px 100px rgba(0,0,0,0.15), 0 0 0 1px rgba(255,255,255,0.5) inset;
+        display: flex; align-items: center; gap: 2.5rem;
+        border-left: 14px solid #6366f1;
+        animation: toast-slide-in 0.7s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        max-width: 850px;
+        min-width: 650px;
+        overflow: hidden;
+        position: relative;
+    }
+    /* Premium Shimmer Effect */
+    .toast::after {
+        content: "";
+        position: absolute; top: 0; left: -100%; width: 50%; height: 100%;
+        background: linear-gradient(to right, transparent, rgba(255,255,255,0.3), transparent);
+        transform: skewX(-25deg);
+        animation: toast-shimmer 3s infinite;
+    }
+    @keyframes toast-shimmer {
+        0% { left: -100%; }
+        100% { left: 200%; }
+    }
+    .toast i { color: #10b981; font-size: 4.5rem; filter: drop-shadow(0 0 15px rgba(16, 185, 129, 0.2)); }
+    .toast-content { flex: 1; }
+    .toast-name { font-weight: 900; font-size: 2.8rem; color: #1e293b; margin-bottom: 0.5rem; line-height: 1; letter-spacing: -1px; }
+    .toast-status { font-size: 1.6rem; font-weight: 800; color: #6366f1; text-transform: uppercase; letter-spacing: 2px; opacity: 0.9; }
+    
+    /* Progress Bar Countdown */
+    .toast-progress {
+        position: absolute; bottom: 0; left: 0; height: 6px;
+        background: #6366f1;
+        width: 100%;
+        animation: toast-countdown 3s linear forwards;
+    }
+    @keyframes toast-countdown {
+        from { width: 100%; }
+        to { width: 0%; }
+    }
+
+    @keyframes toast-slide-in {
+        from { transform: translateX(-120%) scale(0.9); opacity: 0; }
+        to { transform: translateX(0) scale(1); opacity: 1; }
+    }
+    .toast.fade-out {
+        animation: toast-slide-out 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+    @keyframes toast-slide-out {
+        to { transform: translateY(-30px); opacity: 0; }
+    }
+
+    /* Summary Dashboard Styles */
+    .summary-dashboard {
+        background: white; border-radius: 16px; padding: 2.5rem;
+        box-shadow: 0 10px 40px rgba(0,0,0,0.03); border: 1px solid #f1f5f9;
+        text-align: center; margin-bottom: 2rem;
+    }
+    .stats-row { display: flex; justify-content: center; gap: 3rem; margin-bottom: 2.5rem; }
+    .stat-item { flex: 1; max-width: 180px; }
+    .stat-value { font-size: 2.5rem; font-weight: 800; color: #1e293b; display: block; margin-bottom: 0.25rem; }
+    .stat-label { font-size: 0.7rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; }
+    .stat-accent-indigo { color: #6366f1; }
+    .stat-accent-green { color: #10b981; }
+    .stat-accent-red { color: #ef4444; }
+    .summary-actions { display: flex; justify-content: center; gap: 1rem; border-top: 1px solid #f1f5f9; padding-top: 2rem; }
+    .status-indicator { display: inline-flex; align-items: center; gap: 0.5rem; font-size: 0.7rem; font-weight: 700; padding: 0.35rem 0.85rem; border-radius: 20px; background: #f1f5f9; color: #64748b; margin-left: 1rem; }
+    .status-online { background: #ecfdf5 !important; color: #10b981 !important; border: 1px solid #d1fae5; }
+    .status-offline { background: #fef2f2 !important; color: #ef4444 !important; border: 1px solid #fee2e2; }
+    .diag-log { margin-top: 1rem; font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; color: #64748b; background: #f8fafc; padding: 1rem; border-radius: 8px; border: 1px solid #e2e8f0; max-height: 120px; overflow-y: auto; text-align: left; position: relative; }
+    .clear-diag { position: absolute; top: 0.5rem; right: 0.5rem; font-size: 0.6rem; cursor: pointer; color: #94a3b8; }
+    .clear-diag:hover { color: #6366f1; }
+    .status-indicator { display: inline-flex; align-items: center; gap: 0.5rem; font-size: 0.7rem; font-weight: 700; padding: 0.35rem 0.85rem; border-radius: 20px; background: #f1f5f9; color: #64748b; }
+    .status-online { background: #ecfdf5; color: #10b981; border: 1px solid #d1fae5; }
+    .status-offline { background: #fef2f2; color: #ef4444; border: 1px solid #fee2e2; }
+    .diag-log { margin-top: 1rem; font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; color: #64748b; background: #f8fafc; padding: 1rem; border-radius: 8px; border: 1px solid #e2e8f0; max-height: 100px; overflow-y: auto; text-align: left; }
+    .diag-log { margin-top: 1rem; font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; color: #64748b; background: #f8fafc; padding: 1rem; border-radius: 8px; border: 1px solid #e2e8f0; max-height: 100px; overflow-y: auto; text-align: left; }
+  </style>
+
+<body ng-controller="AttendanceCtrl">
+    <!-- Global Toast Container (Top Level) -->
+    <div class="toast-container">
+        <div class="toast" ng-repeat="t in toasts" ng-class="{'fade-out': t.closing}">
+            <i class="fas fa-check-circle"></i>
+            <div class="toast-content">
+                <div class="toast-name">{{t.name}}</div>
+                <div class="toast-status">marked as present</div>
+            </div>
+            <div class="toast-progress"></div>
+        </div>
+    </div>
+  <aside class="sidebar">
+    <a href="dashboard.html" class="sidebar-logo"><i class="fas fa-layer-group"></i> Teacher's Dashboard</a>
+    <nav class="nav-menu">
+      <a href="dashboard.html" class="nav-item"><i class="fas fa-chart-pie"></i> Home</a>
+      <a href="students.html" class="nav-item"><i class="fas fa-address-book"></i> Student list</a>
+      <a href="attendance.html" class="nav-item active"><i class="fas fa-expand-arrows-alt"></i> Face Attendance</a>
+      <a href="manual-attendance.html" class="nav-item"><i class="fas fa-tasks"></i> Manual Attendance</a>
+      <a href="email.html" class="nav-item"><i class="fas fa-satellite-dish"></i> Smart Alerts</a>
+    </nav>
+    <div style="position: absolute; bottom: 2rem; left: 1rem;">
+      <a href="#" ng-click="logout()" class="nav-item" style="color: #cbd5e1 !important; text-decoration: none; display: flex; align-items: center;">
+        <i class="fas fa-sign-out-alt" style="margin-right: 0.75rem;"></i> Logout
+      </a>
+    </div>
+  </aside>
+
+  <main class="main-wrapper">
+
+    <!-- Session Config -->
+    <div class="config-card">
+        <div style="display: flex; justify-content: space-between; margin-bottom: 1.5rem;">
+            <div class="section-title">
+                SESSION CONFIGURATION
+                <span class="status-indicator" ng-class="socketConnected ? 'status-online' : 'status-offline'">
+                    <i class="fas fa-circle" style="font-size: 0.5rem;"></i> {{socketConnected ? 'SYSTEM ONLINE' : 'ATTEMPTING CONNECTION'}}
+                </span>
+            </div>
+            <div ng-if="active" style="display: flex; align-items: center; gap: 1rem;">
+                <button class="btn" style="font-size: 0.7rem; padding: 0.4rem 0.8rem; border: 1px dashed #cbd5e1; border-radius: 6px; color: #64748b;" ng-click="testToast()">
+                    <i class="fas fa-vial" style="margin-right: 0.3rem;"></i> Test Popup
+                </button>
+                <div class="badge badge-green" style="background: #ecfdf5; color: #10b981; border: 1px solid #d1fae5;">Ready to Scan</div>
+            </div>
+        </div>
+        <div style="display: flex; gap: 2rem;">
+            <div class="form-group" style="margin: 0; flex: 1;">
+                <label style="font-size: 0.75rem; color: #94a3b8; font-weight: 700;">Session Subject</label>
+                <select ng-model="config.subject_id" class="form-control" ng-options="s.subject_id as s.name for s in subjects" style="background: #ffffff; border: 1px solid #e5e7eb; border-radius: 10px; font-weight: 600; color: #1e293b;">
+                    <option value="" disabled selected>Select Subject</option>
+                </select>
+            </div>
+            <div class="form-group datepicker-container" style="margin: 0; flex: 1;">
+                <label style="font-size: 0.75rem; color: #94a3b8; font-weight: 700;">Session Date</label>
+                <div class="datepicker-input" ng-click="showDatePicker = !showDatePicker">
+                    <span>{{config.date | date:'dd/MM/yyyy'}}</span>
+                    <i class="fas fa-calendar-alt" style="color: #6b7280;"></i>
+                </div>
+                
+                <div class="datepicker-dropdown" ng-show="showDatePicker">
+                    <div class="cal-header">
+                        <button type="button" class="cal-btn" ng-click="prevMonth($event)"><i class="fas fa-chevron-left"></i></button>
+                        <div class="cal-month">{{monthNames[currentMonth]}} {{currentYear}}</div>
+                        <button type="button" class="cal-btn" ng-click="nextMonth($event)"><i class="fas fa-chevron-right"></i></button>
+                    </div>
+                    <div class="cal-grid">
+                        <div class="cal-day-header" ng-repeat="day in ['Su','Mo','Tu','We','Th','Fr','Sa']">{{day}}</div>
+                        <div class="cal-day empty" ng-repeat="e in emptyDays track by $index"></div>
+                        
+                        <div class="cal-day" ng-repeat="d in daysInMonth track by $index"
+                             ng-class="{'selected': isSelectedDate(d)}"
+                             ng-click="selectDate(d, $event)">
+                             {{d}}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="monitor-section" ng-show="!sessionFinished">
+        <div class="section-title">
+            LIVE RECOGNITION FEED
+            <span class="status-indicator" ng-class="socketConnected ? 'status-online' : 'status-offline'">
+                <i class="fas fa-circle" style="font-size: 0.5rem;"></i> {{socketConnected ? 'SYSTEM ONLINE' : 'ATTEMPTING CONNECTION'}}
+            </span>
+        </div>
+        <div class="video-monitor">
+            <div ng-if="!active" style="position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #0f172a; color: white; text-align: center; padding: 2rem;">
+                <i class="fas fa-video-slash" style="font-size: 3.5rem; opacity: 0.3; margin-bottom: 1.5rem;"></i>
+                <h3 style="font-weight: 700; margin-bottom: 0.5rem;">Camera System Standby</h3>
+                <p style="font-size: 0.9rem; opacity: 0.6;">Configure session and click Start to begin</p>
+            </div>
+            
+            <div class="scanner-overlay" ng-if="active">
+                <div class="scan-line"></div>
+            </div>
+
+            <canvas id="videoCanvas" ng-show="active" style="width: 100%; height: 100%; object-fit: cover;"></canvas>
+        </div>
+
+        <button ng-if="!active" class="btn btn-primary" style="padding: 1rem 3rem; border-radius: 12px; font-size: 1.1rem; box-shadow: 0 4px 15px rgba(99, 102, 241, 0.3);" ng-click="start()">
+            <i class="fas fa-play" style="margin-right: 0.75rem;"></i> Start Session
+        </button>
+        <button ng-if="active" class="btn btn-danger" style="padding: 1rem 3rem; border-radius: 12px; font-size: 1.1rem; box-shadow: 0 4px 15px rgba(239, 68, 68, 0.3);" ng-click="stop()">
+            <i class="fas fa-stop" style="margin-right: 0.75rem;"></i> Stop Session
+        </button>
+    </div>
+
+    <!-- Summary Dashboard -->
+    <div class="summary-dashboard" ng-show="sessionFinished">
+        <div class="section-title" style="margin-bottom: 2rem;">SESSION COMPLETE: RESULTS OVERVIEW</div>
+        
+        <div class="stats-row">
+            <div class="stat-item">
+                <span class="stat-value stat-accent-indigo">{{allStudents.length}}</span>
+                <span class="stat-label">Total Roster</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-value stat-accent-green">{{recognized.length}}</span>
+                <span class="stat-label">Present</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-value stat-accent-red">{{allStudents.length - recognized.length}}</span>
+                <span class="stat-label">Absent</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-value">{{getAttendancePercentage()}}%</span>
+                <span class="stat-label">Coverage</span>
+            </div>
+        </div>
+
+        <div style="display: flex; justify-content: center; gap: 1rem; padding-top: 1.5rem; border-top: 1px solid #f8fafc;">
+            <button class="btn btn-success" style="padding: 1rem 2.5rem; border-radius: 10px; font-weight: 700;" ng-click="submitAttendance()">
+                <i class="fas fa-file-export" style="margin-right: 0.5rem;"></i> Finalize & Save Attendance
+            </button>
+            <button class="btn" style="padding: 1rem 2rem; border-radius: 10px; border: 1px solid #e2e8f0; font-weight: 700;" ng-click="resetSession()">
+                <i class="fas fa-redo" style="margin-right: 0.5rem;"></i> Restart Session
+            </button>
+        </div>
+
+        <div class="diag-log" ng-if="diagEvents.length > 0">
+            <span class="clear-diag" ng-click="diagEvents = []">Clear Logs</span>
+            <div style="font-weight: 800; margin-bottom: 0.5rem; color: #475569;">DIAGNOSTIC EVENT STREAM:</div>
+            <div ng-repeat="e in diagEvents track by $index">[{{e.time}}] {{e.msg}}</div>
+        </div>
+    </div>
+
+    <!-- Attendance Log (Visible only after session stops) -->
+    <div class="verify-card" ng-show="sessionFinished">
+        <div class="verify-header">
+            <div class="section-title">FINAL ATTENDANCE LOG</div>
+            <button class="btn btn-success" ng-click="submitAttendance()" style="background: #10b981; color: white;">
+                <i class="fas fa-check-circle" style="margin-right: 0.5rem;"></i> Confirm & Submit All Records
+            </button>
+        </div>
+        <div style="overflow-x: auto;">
+            <table class="attendance-table" style="width: 100%; border-collapse: collapse;">
+                <thead>
+                    <tr>
+                        <th style="text-align: left; width: 25%;">ENROLLMENT</th>
+                        <th style="text-align: left; width: 25%;">NAME</th>
+                        <th style="text-align: left; width: 25%;">SUBJECT</th>
+                        <th style="text-align: right; width: 25%;">STATUS</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr ng-repeat="s in allStudents">
+                        <td style="font-family: 'JetBrains Mono'; font-weight: 600; color: #6366f1;">{{s.enrollment}}</td>
+                        <td style="font-weight: 600; color: #1e293b;">{{s.name}}</td>
+                        <td style="font-weight: 600; color: #64748b; font-size: 0.85rem;">{{getSubjectName()}}</td>
+                        <td style="text-align: right;">
+                            <span class="status-badge" ng-class="isRecognized(s.enrollment) ? 'status-present' : 'status-absent'">
+                                {{isRecognized(s.enrollment) ? 'Present' : 'Absent'}}
+                            </span>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+  </main>
+
+  <script>
+    angular.module('teacherApp', [])
+    .controller('AttendanceCtrl', function($scope, $http, $window, $filter) {
+      const socket = io();
+      const canvas = document.getElementById('videoCanvas');
+      const ctx = canvas ? canvas.getContext('2d') : null;
+
+      const token = $window.localStorage.getItem('teacherToken');
+      if (!token) $window.location.href = 'login.html';
+      $http.defaults.headers.common['Authorization'] = 'Bearer ' + token;
+
+      $scope.subjects = [];
+      $scope.socketConnected = false;
+      $scope.diagEvents = [];
+      $scope.toasts = [];
+
+      $scope.showToast = (data) => {
+          console.log("TRIGGERING TOAST FOR:", data.name);
+          const toast = { ...data, id: Date.now() };
+          $scope.$applyAsync(() => $scope.toasts.push(toast));
+          setTimeout(() => {
+              $scope.$applyAsync(() => {
+                  const target = $scope.toasts.find(t => t.id === toast.id);
+                  if (target) target.closing = true;
+              });
+              setTimeout(() => {
+                  $scope.$applyAsync(() => {
+                      $scope.toasts = $scope.toasts.filter(t => t.id !== toast.id);
+                  });
+              }, 400);
+          }, 3000);
+      };
+
+      const addDiag = (msg) => {
+          $scope.$applyAsync(() => {
+              $scope.diagEvents.unshift({ time: new Date().toLocaleTimeString(), msg });
+              if ($scope.diagEvents.length > 5) $scope.diagEvents.pop();
+          });
+      };
+
+      const playBeep = () => {
+          try {
+              const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+              const osc = audioCtx.createOscillator();
+              const gain = audioCtx.createGain();
+              osc.connect(gain);
+              gain.connect(audioCtx.destination);
+              osc.type = 'sine';
+              osc.frequency.setValueAtTime(880, audioCtx.currentTime);
+              gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+              gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.5);
+              osc.start();
+              osc.stop(audioCtx.currentTime + 0.5);
+          } catch(e) {}
+      };
+
+      socket.on('connect', () => { $scope.$apply(() => { $scope.socketConnected = true; addDiag("System Link Established"); }); });
+      socket.on('disconnect', () => { $scope.$apply(() => { $scope.socketConnected = false; addDiag("System Link Interrupted"); }); });
+
+      socket.on('attendance-marked', (data) => {
+          console.log("[DIAGNOSTIC] Database Confirmed:", data);
+          addDiag(`DB CONFIRMED: ${data.name}`);
+          // Toast and beep now handled instantly by feed for better UX
+      });
+
+      socket.on('diagnostic-backend', (data) => {
+          console.warn("[DIAGNOSTIC] Backend alert:", data.msg);
+          addDiag(`BACKEND ALERT: ${data.msg}`);
+          // If we want a popup for unknown detections
+          $scope.showToast({ name: 'System Message', enrollment: data.msg, icon: 'fas fa-exclamation-triangle' });
+      });
+
+      $scope.recognized = [];
+      $scope.config = { date: new Date() };
+      
+      $http.get('/api/teacher/subjects').then(res => $scope.subjects = res.data.data);
+      $http.get('/api/teacher/students').then(res => $scope.allStudents = res.data.data);
+
+      $scope.getStudent = (enrollment) => {
+          if (!$scope.allStudents) return {};
+          return $scope.allStudents.find(s => s.enrollment == enrollment) || {};
+      };
+
+      $scope.getSubjectName = () => {
+          if (!$scope.subjects || !$scope.config.subject_id) return 'Unknown';
+          const s = $scope.subjects.find(sub => sub.subject_id == $scope.config.subject_id);
+          return s ? s.name : 'Unknown';
+      };
+
+      // Calendar logic
+      $scope.showDatePicker = false;
+      $scope.monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+      
+      const updateCalView = () => {
+          let cd = new Date($scope.config.date);
+          $scope.currentMonth = cd.getMonth();
+          $scope.currentYear = cd.getFullYear();
+          $scope.buildCalendar();
+      };
+
+      $scope.buildCalendar = () => {
+        const firstDay = new Date($scope.currentYear, $scope.currentMonth, 1).getDay();
+        const daysInMonth = new Date($scope.currentYear, $scope.currentMonth + 1, 0).getDate();
+        $scope.emptyDays = Array.from({length: firstDay}, () => null);
+        $scope.daysInMonth = Array.from({length: daysInMonth}, (_, i) => i + 1);
+      };
+
+      $scope.prevMonth = (e) => {
+        if (e) e.stopPropagation();
+        if ($scope.currentMonth === 0) { $scope.currentMonth = 11; $scope.currentYear--; } else { $scope.currentMonth--; }
+        $scope.buildCalendar();
+      };
+
+      $scope.nextMonth = (e) => {
+        if (e) e.stopPropagation();
+        if ($scope.currentMonth === 11) { $scope.currentMonth = 0; $scope.currentYear++; } else { $scope.currentMonth++; }
+        $scope.buildCalendar();
+      };
+
+      $scope.isSelectedDate = (d) => {
+          let cd = new Date($scope.config.date);
+          return cd.getDate() === d && cd.getMonth() === $scope.currentMonth && cd.getFullYear() === $scope.currentYear;
+      };
+
+      $scope.selectDate = (d, e) => {
+          if (e) e.stopPropagation();
+          $scope.config.date = new Date($scope.currentYear, $scope.currentMonth, d);
+          $scope.showDatePicker = false;
+      };
+
+      updateCalView();
+
+      $scope.start = () => {
+        if (!$scope.config.subject_id) return alert("Please select a subject to start the session.");
+        
+        $scope.active = false; // Reset state before start
+        $http.post('/api/teacher/attendance/face', $scope.config)
+          .then(res => {
+            if (res.data.success) {
+              $scope.active = true;
+              $scope.recognized = [];
+            } else {
+              alert("Server Error: " + (res.data.message || "Failed to start session"));
+            }
+          })
+          .catch(err => {
+            console.error("Initiate Session Detailed Error:", err);
+            const msg = (err.data && err.data.message) ? err.data.message : "Unable to reach the recognition server. Status: " + err.status;
+            alert("Initiation Failed\n" + msg);
+          });
+      };
+
+      $scope.stop = () => { 
+        $http.post('/api/teacher/attendance/stop').then(() => {
+            $scope.active = false;
+            $scope.sessionFinished = true;
+        }); 
+      };
+
+      $scope.resetSession = () => {
+          $scope.sessionFinished = false;
+          $scope.recognized = [];
+      };
+
+      $scope.getAttendancePercentage = () => {
+          if (!$scope.allStudents || $scope.allStudents.length === 0) return 0;
+          return Math.round(($scope.recognized.length / $scope.allStudents.length) * 100);
+      };
+
+      $scope.isRecognized = (enrollment) => {
+          return $scope.recognized.some(r => r.enrollment == enrollment);
+      };
+
+      $scope.submitAttendance = () => {
+          if (!$scope.allStudents || $scope.allStudents.length === 0) return;
+          
+          const list = $scope.allStudents.map(s => ({ 
+              enrollment: s.enrollment, 
+              status: $scope.isRecognized(s.enrollment) ? 'Present' : 'Absent'
+          }));
+          
+          const d = $filter('date')($scope.config.date, 'yyyy-MM-dd');
+          
+          $http.post('/api/teacher/attendance/manual', { 
+            subject_id: $scope.config.subject_id, 
+            date: d, 
+            attendance_array: list 
+          }).then(() => { 
+            alert("Attendance finalized and submitted successfully!"); 
+            $scope.recognized = []; 
+          }).catch(err => {
+            alert("Submission failed: " + (err.data.message || "Server error"));
+          });
+      };
+
+      $scope.testToast = () => {
+          $scope.showToast({ name: 'System Test User', enrollment: 'TEST-MODE' });
+          addDiag("Manual Toast Test Triggered");
+      };
+
+      $scope.logout = () => { 
+        $window.localStorage.removeItem('teacherToken'); 
+        $window.localStorage.removeItem('teacherName');
+        $window.location.href = 'login.html'; 
+      };
+
+      socket.on('attendance-data', (data) => {
+        if (!$scope.active || data.type !== 'feed') return;
+        
+        // Ensure canvas and ctx are available (sometimes lost in DOM updates)
+        const activeCanvas = document.getElementById('videoCanvas');
+        const activeCtx = activeCanvas ? activeCanvas.getContext('2d') : null;
+
+        // Draw video frame
+        if (data.frame && activeCtx) {
+            // Set internal resolution match display size if not set
+            if (activeCanvas.width !== activeCanvas.clientWidth) {
+                activeCanvas.width = activeCanvas.clientWidth;
+                activeCanvas.height = activeCanvas.clientHeight;
+            }
+            const img = new Image();
+            img.onload = () => { 
+                activeCtx.drawImage(img, 0, 0, activeCanvas.width, activeCanvas.height); 
+            };
+            img.src = 'data:image/jpeg;base64,' + data.frame;
+        }
+
+        $scope.$apply(() => {
+            if (data.recognized && data.recognized.length > 0) {
+                data.recognized.forEach(enrollment => {
+                    if (!$scope.recognized.some(r => r.enrollment == enrollment)) {
+                        const student = $scope.getStudent(enrollment);
+                        const sname = student.name || 'Unknown';
+                        
+                        // INSTANT POPUP (Directly from vision feed)
+                        $scope.showToast({ name: sname, enrollment: enrollment });
+                        playBeep();
+                        addDiag(`Instant Detection: ${sname}`);
+
+                        $scope.recognized.unshift({ 
+                            name: sname, 
+                            enrollment: enrollment, 
+                            timestamp: new Date() 
+                        });
+                    }
+                });
+            }
+        });
+      });
+
+      socket.on('attendance-stopped', () => $scope.$apply(() => $scope.active = false));
+    });
+  </script>
+</body>
+</html>

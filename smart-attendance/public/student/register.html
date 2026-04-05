@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en" ng-app="studentApp">
+<head>
+  <meta charset="UTF-8">
+  <title>Student Registration</title>
+  <link rel="stylesheet" href="../css/style.css">
+  <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.8.2/angular.min.js"></script>
+  <style>
+    /* Specific overrides to perfectly match the requested white Registration form */
+    body.auth-container {
+        background: #ffffff !important; 
+    }
+    .auth-card {
+        background: #ffffff !important;
+        border: none !important;
+        border-radius: 12px !important;
+        box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.1) !important;
+        padding: 2.5rem 2rem !important;
+    }
+    .auth-title { 
+        color: #111827 !important;
+        font-size: 1.5rem !important;
+        font-weight: 700 !important;
+        margin-bottom: 0.25rem !important;
+    }
+    .auth-subtitle {
+        color: #6b7280 !important;
+        font-size: 0.85rem !important;
+        margin-bottom: 2rem !important;
+    }
+    .form-group label {
+        color: #6b7280 !important;
+        font-size: 0.75rem !important;
+        font-weight: 500 !important;
+        margin-bottom: 0.25rem !important;
+        text-transform: none !important;
+        letter-spacing: normal !important;
+    }
+    /* Alternating inputs exactly as in screenshot */
+    .form-control.dark-input {
+        background: #6b7280 !important;
+        color: #ffffff !important;
+        border: none !important;
+    }
+    .form-control.dark-input::placeholder { color: rgba(255,255,255,0.7) !important; }
+    
+    .form-control.light-input {
+        background: #eef2ff !important;
+        color: #111827 !important;
+        border: none !important;
+    }
+    .form-control.light-input::placeholder { color: #111827 !important; }
+    
+    .file-input-wrapper {
+        display: flex;
+        align-items: center;
+        background: #6b7280 !important;
+        border: none !important;
+        border-radius: 8px !important;
+        overflow: hidden;
+    }
+    .file-input-button {
+        background: #4b5563 !important;
+        color: #ffffff !important;
+        padding: 0.75rem 1rem !important;
+        font-size: 0.85rem;
+        cursor: pointer;
+        display: inline-block;
+        font-weight: 600;
+        border-right: 1px solid rgba(255,255,255,0.1);
+    }
+    .file-input-text {
+        color: #ffffff !important;
+        padding-left: 1rem !important;
+        font-size: 0.85rem !important;
+    }
+    
+    .hidden-file {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0,0,0,0);
+        border: 0;
+    }
+    .btn-primary {
+        background: #6366f1 !important;
+        color: white !important;
+        box-shadow: none !important;
+        font-weight: 600 !important;
+        border-radius: 8px !important;
+        padding: 0.75rem 0 !important;
+        text-decoration: none !important;
+    }
+    .btn-primary:hover {
+        background: #4f46e5 !important;
+    }
+    .auth-links a {
+        color: #6b7280 !important;
+        font-size: 0.75rem !important;
+        text-decoration: none !important;
+    }
+  </style>
+</head>
+<body class="auth-container">
+  
+  <div class="auth-card" ng-controller="RegisterCtrl" style="max-width: 420px; align-self: center;">
+    
+    <h2 class="auth-title">Student Registration</h2>
+    <p class="auth-subtitle">Create your profile</p>
+
+    <div class="alert badge-red" style="margin-bottom: 1.5rem; padding: 1rem; width: 100%; border: none;" ng-if="error">{{error}}</div>
+
+    <form ng-submit="register()">
+      <div class="form-group">
+        <label>Full Name</label>
+        <input type="text" ng-model="user.name" class="form-control dark-input" placeholder="Aryan Sabhadiya" required>
+      </div>
+      <div class="form-group">
+        <label>Email Address</label>
+        <input type="email" ng-model="user.email" class="form-control light-input" placeholder="12302110501066" required>
+      </div>
+      <div class="form-group">
+        <label>Enrollment Number</label>
+        <input type="text" ng-model="user.enrollment" class="form-control dark-input" placeholder="12302110501066" required>
+      </div>
+      <div class="form-group">
+        <label>Password</label>
+        <input type="password" ng-model="user.password" class="form-control light-input" placeholder="••••••" required>
+      </div>
+      
+      <div class="form-group" style="margin-bottom: 2rem;">
+        <label>Face Photo (For Recognition)</label>
+        <label class="file-input-wrapper">
+          <span class="file-input-button">Choose File</span>
+          <span class="file-input-text">{{fileName || 'No file chosen'}}</span>
+          <input type="file" file-model="user.photo" class="hidden-file" accept="image/*" required onchange="angular.element(this).scope().updateFileName(this)">
+        </label>
+      </div>
+
+      <button type="submit" class="btn btn-primary btn-block" ng-disabled="loading">
+        {{loading ? 'Processing...' : 'Register'}}
+      </button>
+    </form>
+    
+    <div style="margin-top: 1.5rem; text-align: center;" class="auth-links">
+      <a href="login.html">Already registered? Login here</a>
+    </div>
+  </div>
+
+  <script>
+    var app = angular.module('studentApp', []);
+    app.directive('fileModel', ['$parse', function ($parse) {
+        return { restrict: 'A', link: function(scope, element, attrs) {
+            var model = $parse(attrs.fileModel);
+            var modelSetter = model.assign;
+            element.bind('change', function() { scope.$apply(function() { modelSetter(scope, element[0].files[0]); }); });
+        }};
+    }]);
+
+    app.controller('RegisterCtrl', function($scope, $http, $window) {
+      $scope.user = {};
+      
+      $scope.updateFileName = (element) => {
+          if (element.files && element.files[0]) {
+              $scope.$apply(() => { $scope.fileName = element.files[0].name; });
+          }
+      };
+
+      $scope.register = function() {
+        $scope.loading = true; $scope.error = null;
+        var fd = new FormData();
+        for(let key in $scope.user) fd.append(key, $scope.user[key]);
+        $http.post('/api/auth/student/register', fd, { transformRequest: angular.identity, headers: {'Content-Type': undefined} })
+        .then(() => { alert("Registration Successful!"); $window.location.href = 'login.html'; })
+        .catch(err => $scope.error = err.data.message || 'Initialization failed')
+        .finally(() => $scope.loading = false);
+      };
+    });
+  </script>
+</body>
+</html>

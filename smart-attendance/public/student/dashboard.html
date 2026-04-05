@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="en" ng-app="studentApp">
+<head>
+  <meta charset="UTF-8">
+  <title>Student Dashboard</title>
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.8.2/angular.min.js"></script>
+  <style>
+    /* Absolute exact match to the specific screenshot */
+    body {
+        background: #f3f4f6 !important; /* light gray body */
+        color: #111827 !important;
+        font-family: 'Inter', sans-serif !important;
+    }
+    
+    /* Sidebar */
+    .sidebar {
+        background: #273e87 !important; /* deep blue */
+        border-right: none !important;
+        width: 250px !important;
+        padding-top: 2rem !important;
+        height: 100vh !important;
+        position: fixed !important;
+        top: 0;
+        left: 0;
+        bottom: 0;
+        display: flex;
+        flex-direction: column;
+        z-index: 100;
+    }
+    
+    /* Custom Calendar Styles */
+    .datepicker-container { position: relative; }
+    .datepicker-trigger { 
+        display: flex; align-items: center; gap: 0.5rem; cursor: pointer;
+        color: #6366f1; transition: all 0.2s;
+    }
+    .datepicker-trigger:hover { color: #4338ca; }
+    .datepicker-trigger span { font-weight: 700; font-size: 0.85rem; border-bottom: 2px solid rgba(99,102,241,0.2); }
+    
+    .datepicker-dropdown {
+        position: absolute; top: calc(100% + 15px); right: 0; background: #ffffff;
+        border-radius: 16px; box-shadow: 0 15px 50px -12px rgba(0,0,0,0.15);
+        border: 1px solid #f1f5f9; width: 300px; padding: 1.25rem; z-index: 1000;
+        animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    @keyframes slideUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+    .cal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+    .cal-current { font-size: 0.95rem; font-weight: 800; color: #1e293b; }
+    .cal-nav { display: flex; gap: 0.25rem; }
+    .cal-nav-btn { 
+        width: 28px; height: 28px; border-radius: 6px; border: none; background: #f8fafc;
+        color: #64748b; cursor: pointer; display: flex; align-items: center; justify-content: center;
+        transition: all 0.2s;
+    }
+    .cal-nav-btn:hover { background: #e2e8f0; color: #1e293b; }
+
+    .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+    .cal-weekday { text-align: center; font-size: 0.7rem; font-weight: 700; color: #94a3b8; padding: 0.5rem 0; text-transform: uppercase; }
+    .cal-day { 
+        height: 36px; display: flex; align-items: center; justify-content: center; border-radius: 8px;
+        font-size: 0.85rem; font-weight: 600; color: #475569; cursor: pointer; transition: all 0.15s;
+    }
+    .cal-day:hover:not(.empty) { background: #f1f5f9; color: #111827; }
+    .cal-day.empty { visibility: hidden; }
+    .cal-day.selected { background: #374151 !important; color: #ffffff !important; border-radius: 4px; }
+    .cal-day.today { color: #6366f1; font-weight: 800; border-bottom: 2px solid #6366f1; border-radius: 0; }
+
+    .cal-footer { 
+        display: flex; justify-content: space-between; padding-top: 1rem; margin-top: 0.75rem;
+        border-top: 1px solid #f1f5f9;
+    }
+    .cal-footer-btn { 
+        font-size: 0.75rem; font-weight: 800; color: #6366f1; background: none; border: none;
+        cursor: pointer; padding: 0.25rem 0.5rem; border-radius: 4px; transition: background 0.2s;
+    }
+    .cal-footer-btn:hover { background: #eef2ff; }
+    .sidebar-logo {
+        color: #ffffff !important;
+        font-size: 1.5rem !important;
+        font-weight: 700 !important;
+        margin-bottom: 2.5rem !important;
+        padding-left: 1.5rem;
+    }
+    .sidebar-logo i { display: none; } /* No icon in screenshot for SmartAttend */
+    .nav-menu { padding: 0 1rem !important; }
+    .nav-item {
+        color: #e5e7eb !important;
+        padding: 0.75rem 1rem !important;
+        border-radius: 8px !important;
+        font-size: 0.95rem !important;
+        margin-bottom: 0.5rem !important;
+    }
+    .nav-item.active {
+        background: rgba(255, 255, 255, 0.15) !important;
+        color: #ffffff !important;
+        font-weight: 600 !important;
+    }
+    .nav-item i {
+        margin-right: 0.75rem !important;
+        font-size: 1rem !important;
+        text-align: center;
+        width: auto !important;
+    }
+    
+    .main-wrapper {
+        margin-left: 250px !important;
+        min-height: 100vh;
+        background: #f3f4f6 !important;
+        padding: 2.5rem 2.5rem 2.5rem 3rem !important;
+    }
+    
+    /* Header */
+    .page-title {
+        color: #1e293b !important;
+        font-size: 2rem !important;
+        font-weight: 800 !important;
+        letter-spacing: -0.5px !important;
+        margin-bottom: 0.15rem !important;
+    }
+    .page-subtitle {
+        color: #94a3b8 !important;
+        font-size: 0.95rem !important;
+        font-weight: 500 !important;
+        margin-bottom: 2rem !important;
+    }
+    
+    /* Grid Layout */
+    .dashboard-grid {
+      display: grid;
+      grid-template-columns: 4fr 6fr;
+      gap: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+    
+    /* Left Profile Card */
+    .profile-card {
+      background: #eef2ff !important; /* Very light indigo */
+      border-radius: 24px;
+      padding: 0;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.02);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      position: relative;
+    }
+    .profile-top {
+        padding: 3rem 2rem 2rem 2rem;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        width: 100%;
+    }
+    .avatar-box {
+      width: 110px;
+      height: 110px;
+      background: linear-gradient(135deg, #6366f1, #4f46e5);
+      border-radius: 28px; /* Squircle */
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-size: 3rem;
+      font-weight: 700;
+      margin-bottom: 1.5rem;
+      box-shadow: 0 10px 25px -5px rgba(99, 102, 241, 0.4);
+    }
+    .profile-name {
+      font-size: 1.35rem;
+      font-weight: 800;
+      color: #111827;
+      margin-bottom: 0.25rem;
+    }
+    .profile-id {
+      font-size: 0.85rem;
+      color: #6b7280;
+      margin-bottom: 0.5rem;
+    }
+    .profile-stat-divider {
+        width: 100%;
+        border-top: 1px solid rgba(0,0,0,0.06); /* prominent horizontal line */
+        padding: 1.25rem 0;
+    }
+    .stat-number {
+        font-size: 1.25rem;
+        font-weight: 800;
+        color: #111827;
+        margin-bottom: 0.15rem;
+    }
+    .stat-text {
+        font-size: 0.75rem;
+        color: #6b7280;
+    }
+    
+    /* Right Daily Status Card */
+    .status-card {
+      background: #ffffff;
+      border-radius: 16px;
+      padding: 1.5rem;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.03);
+      display: flex;
+      flex-direction: column;
+    }
+    .status-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+    }
+    .status-title { 
+        font-size: 0.75rem; 
+        font-weight: 700; 
+        color: #9ca3af; 
+        text-transform: uppercase; 
+        letter-spacing: 0.05em;
+    }
+    
+    .status-list-wrapper {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+    .status-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.75rem 1rem;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+    }
+    .status-item-name { 
+        font-weight: 700; 
+        color: #4b5563; 
+        font-size: 0.65rem; 
+        text-transform: uppercase; 
+        letter-spacing: 0.02em;
+    }
+    .status-badge-present { 
+        background: #f0fdf4 !important; 
+        color: #16a34a !important; 
+        padding: 0.25rem 0.6rem; 
+        border-radius: 4px; 
+        font-size: 0.65rem; 
+        font-weight: 700; 
+    }
+    .status-badge-absent { 
+        background: #fef2f2 !important; 
+        color: #dc2626 !important; 
+        padding: 0.25rem 0.6rem; 
+        border-radius: 4px; 
+        font-size: 0.65rem; 
+        font-weight: 700; 
+    }
+    
+    /* Bottom Bar Chart */
+    .chart-card {
+        background: #ffffff;
+        border-radius: 16px;
+        padding: 1.5rem;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.03);
+    }
+    .chart-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1.5rem;
+    }
+    .chart-title { 
+        font-size: 0.75rem; 
+        font-weight: 700; 
+        color: #9ca3af; 
+        text-transform: uppercase; 
+        letter-spacing: 0.05em;
+    }
+    .chart-badge {
+        background: #eff6ff; 
+        color: #3b82f6; 
+        padding: 0.35rem 0.75rem; 
+        border-radius: 9999px; 
+        font-size: 0.75rem; 
+        font-weight: 600;
+    }
+    
+    /* Actual Chart layout from photo */
+    .css-chart-container {
+        position: relative; 
+        height: 250px; 
+        display: flex;
+    }
+    .y-axis {
+        display: flex; 
+        flex-direction: column; 
+        justify-content: space-between; 
+        width: 35px; 
+        color: #9ca3af; 
+        font-size: 0.65rem; 
+        font-weight: 600; 
+        text-align: right; 
+        padding-right: 10px;
+        padding-bottom: 25px; /* space for x-axis */
+    }
+    .chart-area {
+        flex: 1;
+        position: relative;
+        padding-bottom: 25px;
+    }
+    .grid-lines {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        padding-bottom: 25px;
+    }
+    .grid-line {
+        height: 1px;
+        width: 100%;
+        background: #f3f4f6;
+    }
+    
+    .bars-content {
+        position: absolute;
+        inset: 0;
+        bottom: 25px;
+        display: flex;
+        justify-content: space-around;
+        align-items: flex-end;
+    }
+    .bar-col {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        height: 100%;
+        position: relative;
+        justify-content: flex-end;
+    }
+    .bar-track {
+        width: 12px;
+        height: 100%;
+        background: #f3f4f6;
+        border-radius: 6px;
+        display: flex;
+        align-items: flex-end;
+    }
+    .bar-fill {
+        width: 100%;
+        background: #7c3aed; /* Purple/Blue */
+        border-radius: 6px;
+    }
+    .x-label {
+        position: absolute;
+        bottom: -25px;
+        font-size: 0.65rem;
+        font-weight: 600;
+        color: #9ca3af;
+    }
+    
+  </style>
+</head>
+<body ng-controller="DashboardCtrl">
+
+  <aside class="sidebar">
+    <a href="dashboard.html" class="sidebar-logo" style="text-decoration:none;">Student Dashboard</a>
+    <nav class="nav-menu">
+      <a href="dashboard.html" class="nav-item active"><i class="fas fa-th-large"></i> Home</a>
+      <a href="subjects.html" class="nav-item"><i class="fas fa-book"></i> Subjects</a>
+    </nav>
+    <div style="position: absolute; bottom: 2rem; left: 1rem;">
+      <a href="#" ng-click="logout()" class="nav-item" style="color: #cbd5e1 !important; text-decoration: none; display: flex; align-items: center;">
+        <i class="fas fa-sign-out-alt"></i> Logout
+      </a>
+    </div>
+  </aside>
+
+  <main class="main-wrapper">
+    <div class="page-header">
+      <h1 class="page-title">Welcome back, {{student.name}}</h1>
+      <p class="page-subtitle">Here's what's happening with your attendance today.</p>
+    </div>
+
+    <div class="dashboard-grid">
+        
+        <!-- Left: Avatar Profile Card -->
+        <div class="profile-card">
+            <div class="profile-top">
+                <div class="avatar-box">{{initial}}</div>
+                <div class="profile-name">{{student.name}}</div>
+                <div class="profile-id">ID: {{student.enrollment}}</div>
+            </div>
+            <div class="profile-stat-divider">
+                <div class="stat-number">{{attendanceData.length || 0}}</div>
+                <div class="stat-text">Total Subjects Enrolled</div>
+            </div>
+        </div>
+        
+        <!-- Right: Daily Status List -->
+        <div class="status-card">
+            <div class="status-header">
+                <div class="status-title">DAILY STATUS</div>
+                
+                <div class="datepicker-container">
+                    <div class="datepicker-trigger" ng-click="toggleDatePicker()">
+                        <span>{{selectedDate | date:'dd/MM/yyyy'}}</span>
+                        <i class="far fa-calendar-alt" style="font-size: 1rem; color: #374151;"></i>
+                    </div>
+
+                    <div class="datepicker-dropdown" ng-show="showDatePicker">
+                        <div class="cal-header">
+                            <div class="cal-current" style="display: flex; align-items: center; gap: 0.3rem; cursor: pointer;">
+                                {{monthNames[currentMonth]}} {{currentYear}} <i class="fas fa-chevron-down" style="font-size: 0.7rem; opacity: 0.5;"></i>
+                            </div>
+                            <div class="cal-nav">
+                                <button type="button" class="cal-nav-btn" ng-click="prevMonth()"><i class="fas fa-arrow-up" style="font-size: 0.8rem;"></i></button>
+                                <button type="button" class="cal-nav-btn" ng-click="nextMonth()"><i class="fas fa-arrow-down" style="font-size: 0.8rem;"></i></button>
+                            </div>
+                        </div>
+                        <div class="cal-grid">
+                            <div class="cal-weekday" ng-repeat="d in ['Su','Mo','Tu','We','Th','Fr','Sa']">{{d}}</div>
+                            <div class="cal-day empty" ng-repeat="e in emptyDays track by $index"></div>
+                            <div class="cal-day" ng-repeat="d in daysInMonth" 
+                                 ng-class="{'selected': isSelectedDate(d), 'today': isToday(d)}"
+                                 ng-click="selectDate(d)">{{d}}</div>
+                        </div>
+                        <div class="cal-footer">
+                            <button type="button" class="cal-footer-btn" ng-click="clearDate()">Clear</button>
+                            <button type="button" class="cal-footer-btn" ng-click="setToday()">Today</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="status-list-wrapper" ng-if="dailyViewData && dailyViewData.length > 0">
+                <div class="status-item" ng-repeat="sub in dailyViewData">
+                    <span class="status-item-name">{{sub.subject_name}}</span>
+                    <span ng-class="sub.status === 'Present' ? 'status-badge-present' : 'status-badge-absent'">{{sub.status}}</span>
+                </div>
+            </div>
+            
+            <div ng-if="!dailyViewData || dailyViewData.length === 0" style="padding: 2rem; text-align: center; color: #9ca3af; font-size: 0.85rem;">
+                No attendance recorded for {{selectedDate | date:'mediumDate'}}.
+            </div>
+        </div>
+        
+    </div>
+
+    <!-- Bottom: Attendance Performance Chart -->
+    <div class="chart-card">
+        <div class="chart-header">
+            <div class="chart-title">ATTENDANCE PERFORMANCE</div>
+            <div class="chart-badge">Real-time Analytics</div>
+        </div>
+        
+        <div class="css-chart-container">
+            <div class="y-axis">
+                <span>100%</span>
+                <span>90%</span>
+                <span>80%</span>
+                <span>70%</span>
+                <span>60%</span>
+                <span>50%</span>
+                <span>40%</span>
+                <span>30%</span>
+                <span>20%</span>
+                <span>10%</span>
+                <span>0%</span>
+            </div>
+            
+            <div class="chart-area">
+                <div class="grid-lines">
+                    <div class="grid-line"></div><div class="grid-line"></div>
+                    <div class="grid-line"></div><div class="grid-line"></div>
+                    <div class="grid-line"></div><div class="grid-line"></div>
+                    <div class="grid-line"></div><div class="grid-line"></div>
+                    <div class="grid-line"></div><div class="grid-line"></div>
+                    <div class="grid-line"></div>
+                </div>
+                
+                <div class="bars-content">
+                    <div class="bar-col" ng-repeat="sub in attendanceData">
+                        <div class="bar-track">
+                            <div class="bar-fill" ng-style="{'height': sub.percentage + '%'}"></div>
+                        </div>
+                        <div class="x-label">{{getAcronym(sub.subject_name)}}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+  </main>
+
+  <script>
+    angular.module('studentApp', [])
+    .controller('DashboardCtrl', function($scope, $http, $window, $filter) {
+      const token = $window.localStorage.getItem('studentToken');
+      if (!token) $window.location.href = 'login.html'; 
+      $http.defaults.headers.common['Authorization'] = 'Bearer ' + token;
+
+      $scope.getAcronym = (name) => {
+          if (!name) return "";
+          return name.split(' ').map(w => w[0]).join('').substring(0, 4).toUpperCase();
+      };
+      
+      // Custom Calendar logic for professional UX
+      $scope.selectedDate = new Date();
+      $scope.showDatePicker = false;
+      $scope.monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+      
+      $scope.toggleDatePicker = () => {
+          $scope.showDatePicker = !$scope.showDatePicker;
+          if ($scope.showDatePicker) updateCalView();
+      };
+      
+      const updateCalView = () => {
+          let cd = new Date($scope.selectedDate || new Date());
+          $scope.currentMonth = cd.getMonth();
+          $scope.currentYear = cd.getFullYear();
+          $scope.buildCalendar();
+      };
+
+      $scope.buildCalendar = () => {
+        const firstDay = new Date($scope.currentYear, $scope.currentMonth, 1).getDay();
+        const daysInMonth = new Date($scope.currentYear, $scope.currentMonth + 1, 0).getDate();
+        $scope.emptyDays = Array.from({length: firstDay}, () => null);
+        $scope.daysInMonth = Array.from({length: daysInMonth}, (_, i) => i + 1);
+      };
+
+      $scope.prevMonth = () => {
+        if ($scope.currentMonth === 0) { $scope.currentMonth = 11; $scope.currentYear--; } else { $scope.currentMonth--; }
+        $scope.buildCalendar();
+      };
+
+      $scope.nextMonth = () => {
+        if ($scope.currentMonth === 11) { $scope.currentMonth = 0; $scope.currentYear++; } else { $scope.currentMonth++; }
+        $scope.buildCalendar();
+      };
+
+      $scope.isSelectedDate = (d) => {
+          if (!$scope.selectedDate) return false;
+          let cd = new Date($scope.selectedDate);
+          return cd.getDate() === d && cd.getMonth() === $scope.currentMonth && cd.getFullYear() === $scope.currentYear;
+      };
+
+      $scope.isToday = (d) => {
+          let today = new Date();
+          return d === today.getDate() && today.getMonth() === $scope.currentMonth && today.getFullYear() === $scope.currentYear;
+      };
+
+      $scope.selectDate = (d) => {
+          $scope.selectedDate = new Date($scope.currentYear, $scope.currentMonth, d);
+          $scope.showDatePicker = false;
+          $scope.updateDailyView();
+      };
+
+      $scope.setToday = () => {
+          $scope.selectedDate = new Date();
+          updateCalView();
+          $scope.updateDailyView();
+          $scope.showDatePicker = false;
+      };
+
+      $scope.clearDate = () => {
+          $scope.selectedDate = null;
+          $scope.updateDailyView();
+          $scope.showDatePicker = false;
+      };
+
+      $scope.updateDailyView = () => {
+          if (!$scope.allCalendarRecords || !$scope.selectedDate) {
+              $scope.dailyViewData = [];
+              return;
+          }
+          const target = $filter('date')($scope.selectedDate, 'yyyy-MM-dd');
+          
+          $scope.dailyViewData = $scope.allCalendarRecords.filter(r => {
+              // Standardizing comparison to avoid timezone shifts
+              const recordDate = $filter('date')(new Date(r.date), 'yyyy-MM-dd');
+              return recordDate === target;
+          });
+      };
+
+      updateCalView();
+
+      const loadData = () => {
+        $http.get('/api/student/dashboard').then(res => {
+            $scope.student = res.data.data;
+            if ($scope.student && $scope.student.name) {
+                $scope.initial = $scope.student.name.charAt(0).toUpperCase();
+            }
+        });
+        
+        $http.get('/api/student/attendance').then(res => {
+            $scope.attendanceData = res.data.data;
+            if ($scope.attendanceData.length === 0) {
+                $scope.attendanceData = [
+                    { subject_name: "Software Engineering", percentage: 60 },
+                    { subject_name: "Supply Chain Management", percentage: 100 },
+                    { subject_name: "Advanced Web Development", percentage: 100 },
+                    { subject_name: "Data Science and Visulization", percentage: 100 },
+                    { subject_name: "IoT Architecture and Protocols", percentage: 50 },
+                ];
+            }
+        });
+        
+        // Load actual calendar data for the Daily Status View
+        $http.get('/api/student/calendar').then(res => {
+            $scope.allCalendarRecords = res.data.data;
+            $scope.updateDailyView();
+        });
+      };
+
+      $scope.logout = () => { $window.localStorage.removeItem('studentToken'); $window.location.href = 'login.html'; };
+
+      loadData();
+    });
+  </script>
+</body>
+</html>

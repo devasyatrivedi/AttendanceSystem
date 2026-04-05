@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en" ng-app="teacherApp">
+<head>
+  <meta charset="UTF-8">
+  <title>Student Directory | Teacher's Dashboard</title>
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.8.2/angular.min.js"></script>
+  <style>
+    .table-container { 
+        background: white; 
+        border-radius: 20px; 
+        box-shadow: 0 10px 30px rgba(15, 23, 42, 0.04), 0 1px 3px rgba(15, 23, 42, 0.02); 
+        overflow: hidden;
+        border: 1px solid #eef2f6;
+    }
+    .box-header {
+        border-bottom: 1px solid #f1f5f9;
+        background: #ffffff;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+    .search-input-group {
+        position: relative;
+        width: 320px;
+    }
+    .search-input-group i {
+        position: absolute;
+        left: 1.25rem;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #94a3b8;
+        font-size: 0.9rem;
+        z-index: 10;
+    }
+    .search-input-group .form-control {
+        padding-left: 3rem;
+        border-radius: 12px;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        font-size: 0.9rem;
+        height: 42px;
+        width: 100%;
+        transition: all 0.2s;
+    }
+    .search-input-group .form-control:focus {
+        background: white;
+        border-color: #6366f1;
+        box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.1);
+        outline: none;
+    }
+    .student-table th {
+        background: #fafbfd;
+        padding: 1.25rem 2rem;
+        font-weight: 700;
+        color: #64748b;
+        text-transform: uppercase;
+        font-size: 0.75rem;
+        letter-spacing: 0.1em;
+        border-bottom: 1px solid #f1f5f9;
+    }
+    .student-table td {
+        padding: 1.5rem 2rem;
+        vertical-align: middle;
+        transition: all 0.2s;
+    }
+    .student-table tr {
+        border-bottom: 1px solid #f8fafc;
+    }
+    .student-table tr:last-child {
+        border-bottom: none;
+    }
+    .student-table tr:hover td {
+        background: #f8fafc;
+    }
+    .btn-edit {
+        background: #ffffff;
+        color: #475569;
+        border: 1px solid #e2e8f0;
+        padding: 0.6rem 1.25rem;
+        border-radius: 10px;
+        font-size: 0.85rem;
+        font-weight: 600;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.6rem;
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+    }
+    .btn-edit:hover {
+        background: #f8fafc;
+        border-color: #cbd5e1;
+        color: #0f172a;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+    }
+    .student-avatar {
+        width: 48px;
+        height: 48px;
+        border-radius: 14px;
+        object-fit: cover;
+        border: 2px solid #ffffff;
+        background: #f1f5f9;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 800;
+        color: var(--primary);
+        font-size: 1.1rem;
+        box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08);
+    }
+    .enrollment-pill {
+        color: #6366f1;
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 0.85rem;
+        font-weight: 600;
+        background: #f5f3ff;
+        padding: 0.4rem 0.8rem;
+        border-radius: 10px;
+        border: 1px solid #ede9fe;
+        display: inline-flex;
+        align-items: center;
+    }
+    .student-name {
+        font-size: 1.05rem;
+        font-weight: 600;
+        color: #1e293b;
+        letter-spacing: -0.01em;
+    }
+    .contact-info {
+        color: #64748b;
+        font-size: 0.95rem;
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+    }
+    .contact-info i {
+        color: #cbd5e1;
+        font-size: 1.1rem;
+    }
+  </style>
+</head>
+<body ng-controller="StudentsCtrl">
+
+  <aside class="sidebar">
+    <a href="dashboard.html" class="sidebar-logo"><i class="fas fa-layer-group"></i> Teacher's Dashboard</a>
+    <nav class="nav-menu">
+      <a href="dashboard.html" class="nav-item"><i class="fas fa-chart-pie"></i> Home</a>
+      <a href="students.html" class="nav-item active"><i class="fas fa-address-book"></i> Student list</a>
+      <a href="attendance.html" class="nav-item"><i class="fas fa-expand-arrows-alt"></i> Face Attendance</a>
+      <a href="manual-attendance.html" class="nav-item"><i class="fas fa-tasks"></i> Manual Attendance</a>
+
+      <a href="email.html" class="nav-item"><i class="fas fa-satellite-dish"></i> Smart Alerts</a>
+    </nav>
+    <div style="position: absolute; bottom: 2rem; left: 1rem;">
+      <a href="#" ng-click="logout()" class="nav-item" style="color: #cbd5e1 !important; text-decoration: none; display: flex; align-items: center;">
+        <i class="fas fa-sign-out-alt" style="margin-right: 0.75rem;"></i> Logout
+      </a>
+    </div>
+  </aside>
+
+  <main class="main-wrapper">
+    <div class="page-header" style="margin-bottom: 3rem;">
+      <div>
+        <h1 class="page-title">Student Directory</h1>
+        <p class="page-subtitle">Manage student profiles, enrollment data, and recognition assets.</p>
+      </div>
+      <button class="btn btn-primary" ng-click="openRegisterModal()">
+        <i class="fas fa-user-plus" style="margin-right: 0.5rem;"></i> Register Student
+      </button>
+    </div>
+
+    <div class="table-container">
+      <div class="box-header" style="padding: 1.5rem 2rem;">
+        <div class="box-title">STUDENT ENROLLMENT</div>
+        <div class="search-input-group">
+          <i class="fas fa-search"></i>
+          <input type="text" ng-model="search" class="form-control" placeholder="Search by name or enrollment...">
+        </div>
+      </div>
+      <div style="overflow-x: auto;">
+        <table class="student-table" style="width: 100%; border-collapse: separate; border-spacing: 0;">
+          <thead>
+            <tr style="border-bottom: 2px solid #f1f5f9;">
+              <th style="width: 20%; padding: 1.5rem 2rem; color: #64748b; font-weight: 700;">STUDENT</th>
+              <th style="width: 30%; padding: 1.5rem 2rem; color: #64748b; font-weight: 700;">Enrollment</th>
+              <th style="width: 35%; padding: 1.5rem 2rem; color: #64748b; font-weight: 700;">Email ID</th>
+              <th style="width: 15%; padding: 1.5rem 2rem; color: #64748b; font-weight: 700; text-align: right;">OPERATIONS</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr ng-repeat="s in students | filter:search">
+              <td style="width: 20%;">
+                <div style="display: flex; align-items: center; gap: 1.25rem;">
+                    <img ng-if="s.photo_path" ng-src="{{s.photo_path}}" class="student-avatar" alt="{{s.name}}">
+                    <div ng-if="!s.photo_path" class="student-avatar">{{s.name.substring(0,1)}}</div>
+                    <span class="student-name" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{s.name}}</span>
+                </div>
+              </td>
+              <td style="width: 30%;">
+                <span class="enrollment-pill">
+                    <i class="fas fa-fingerprint" style="margin-right: 0.5rem; opacity: 0.5;"></i>
+                    {{s.enrollment}}
+                </span>
+              </td>
+              <td style="width: 35%;">
+                <div class="contact-info">
+                    <i class="far fa-envelope-open"></i>
+                    {{s.email}}
+                </div>
+              </td>
+              <td style="text-align: right; width: 15%;">
+                <button class="btn-edit" ng-click="editStudent(s)">
+                  <i class="fas fa-user-edit" style="font-size: 0.9rem;"></i> Edit Profile
+                </button>
+              </td>
+            </tr>
+            <tr ng-if="!students || (students | filter:search).length === 0">
+                <td colspan="4" style="text-align: center; padding: 4rem; color: #94a3b8;">
+                    No students found in the directory.
+                </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+
+  <!-- Edit Modal -->
+  <div ng-if="editing" style="position: fixed; inset: 0; background: rgba(15, 23, 42, 0.7); backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center; z-index: 1000;">
+    <div class="auth-card" style="max-width: 500px; padding: 2.5rem; border: 1px solid rgba(255,255,255,0.1);">
+      <h3 style="margin-bottom: 2rem; font-size: 1.5rem; font-weight: 800; color: #1e293b; text-align: center;">Edit Student Profile</h3>
+      <form ng-submit="saveEdit()">
+        <div class="form-group">
+          <label>Full Name</label>
+          <input type="text" ng-model="editForm.name" class="form-control" required placeholder="Enter student's full name">
+        </div>
+        <div class="form-group">
+          <label>Email Address</label>
+          <input type="email" ng-model="editForm.email" class="form-control" required placeholder="student@example.com">
+        </div>
+        <div class="form-group">
+          <label>Enrollment Number</label>
+          <input type="text" ng-model="editForm.enrollment" class="form-control" required placeholder="Unique ID">
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 2.5rem;">
+          <button type="button" class="btn btn-outline" ng-click="closeModal()" style="padding: 0.75rem;">Cancel</button>
+          <button type="submit" class="btn btn-primary" style="padding: 0.75rem;">Save Changes</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Register Modal -->
+  <div ng-if="registering" style="position: fixed; inset: 0; background: rgba(15, 23, 42, 0.7); backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center; z-index: 1000;">
+    <div class="auth-card" style="max-width: 500px; padding: 2.5rem; border: 1px solid rgba(255,255,255,0.1);">
+        <h3 style="margin-bottom: 0.5rem; font-size: 1.5rem; font-weight: 800; color: #1e293b; text-align: center;">Register New Student</h3>
+        <p style="text-align: center; color: #64748b; font-size: 0.9rem; margin-bottom: 2rem;">Create a new student profile and upload a face photo.</p>
+        
+        <div class="alert badge-red" style="margin-bottom: 1.5rem; padding: 0.75rem; width: 100%; border: none;" ng-if="regError">{{regError}}</div>
+
+        <form ng-submit="registerStudent()">
+            <div class="form-group">
+                <label>Full Name</label>
+                <input type="text" ng-model="regForm.name" class="form-control" placeholder="e.g. John Doe" required>
+            </div>
+            <div class="form-group">
+                <label>Email Address</label>
+                <input type="email" ng-model="regForm.email" class="form-control" placeholder="john@example.com" required>
+            </div>
+            <div class="form-group">
+                <label>Enrollment Number</label>
+                <input type="text" ng-model="regForm.enrollment" class="form-control" placeholder="e.g. 123456" required>
+            </div>
+            <div class="form-group">
+                <label>Face Photo (JPEG/PNG)</label>
+                <input type="file" file-model="regForm.photo" class="form-control" accept="image/*" required>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 2rem;">
+                <button type="button" class="btn btn-outline" ng-click="closeRegisterModal()">Cancel</button>
+                <button type="submit" class="btn btn-primary" ng-disabled="regLoading">
+                    {{regLoading ? 'Processing...' : 'Register'}}
+                </button>
+            </div>
+        </form>
+    </div>
+  </div>
+
+  <script>
+    angular.module('teacherApp', [])
+    .directive('fileModel', ['$parse', function ($parse) {
+        return {
+            restrict: 'A',
+            link: function (scope, element, attrs) {
+                var model = $parse(attrs.fileModel);
+                var modelSetter = model.assign;
+                element.bind('change', function () {
+                    scope.$apply(function () {
+                        modelSetter(scope, element[0].files[0]);
+                    });
+                });
+            }
+        };
+    }])
+    .controller('StudentsCtrl', function($scope, $http, $window) {
+      const token = $window.localStorage.getItem('teacherToken');
+      if (!token) $window.location.href = 'login.html';
+      $http.defaults.headers.common['Authorization'] = 'Bearer ' + token;
+
+      $scope.loadStudents = () => { $http.get('/api/teacher/students').then(res => $scope.students = res.data.data); };
+      $scope.loadStudents();
+
+      $scope.logout = () => { 
+        $window.localStorage.removeItem('teacherToken'); 
+        $window.localStorage.removeItem('teacherName');
+        $window.location.href = 'login.html'; 
+      };
+
+      // Edit Modal
+      $scope.editStudent = (s) => { $scope.editForm = angular.copy(s); $scope.editing = true; };
+      $scope.closeModal = () => { $scope.editing = false; };
+      $scope.saveEdit = () => {
+        $http.put('/api/teacher/students/' + $scope.editForm.student_id, $scope.editForm).then(() => {
+          $scope.editing = false; $scope.loadStudents();
+        });
+      };
+
+      // Register Modal
+      $scope.openRegisterModal = () => { $scope.regForm = {}; $scope.registering = true; $scope.regError = null; };
+      $scope.closeRegisterModal = () => { $scope.registering = false; };
+      $scope.registerStudent = () => {
+        $scope.regLoading = true;
+        var fd = new FormData();
+        fd.append('name', $scope.regForm.name);
+        fd.append('email', $scope.regForm.email);
+        fd.append('enrollment', $scope.regForm.enrollment);
+        fd.append('password', '123456'); // Default password for teacher-side registration
+        if ($scope.regForm.photo) fd.append('photo', $scope.regForm.photo);
+
+        $http.post('/api/auth/student/register', fd, {
+          transformRequest: angular.identity,
+          headers: { 'Content-Type': undefined }
+        }).then(() => {
+          $scope.registering = false;
+          $scope.loadStudents();
+        }).catch(err => {
+          $scope.regError = err.data.message || 'Registration failed';
+        }).finally(() => {
+          $scope.regLoading = false;
+        });
+      };
+    });
+  </script>
+</body>
+</html>

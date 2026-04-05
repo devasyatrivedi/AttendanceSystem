@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en" ng-app="teacherApp">
+<head>
+  <meta charset="UTF-8">
+  <title>Manual Attendance | Teacher's Dashboard</title>
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.8.2/angular.min.js"></script>
+  <style>
+    /* Custom Datepicker */
+    .datepicker-container { position: relative; }
+    .datepicker-input { 
+        background: #ffffff; border: 1px solid var(--glass-border); color: #111827;
+        padding: 0.85rem 1.25rem; border-radius: 8px; width: 100%; cursor: pointer;
+        font-size: 0.95rem; display: flex; justify-content: space-between; align-items: center;
+    }
+    .datepicker-dropdown {
+        position: absolute; top: calc(100% + 5px); left: 0; background: #ffffff;
+        border-radius: 12px; box-shadow: 0 10px 40px -10px rgba(0,0,0,0.15);
+        border: 1px solid #f3f4f6; width: 320px; padding: 1.5rem; z-index: 1000;
+    }
+    .cal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
+    .cal-btn { background: #f3f4f6; border: none; border-radius: 8px; width: 32px; height: 32px; color: #4b5563; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background 0.2s; }
+    .cal-btn:hover { background: #e5e7eb; color: #111827; }
+    .cal-month { font-size: 1.05rem; font-weight: 800; color: #111827; text-align: center; }
+    .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+    .cal-day-header { text-align: center; font-size: 0.75rem; font-weight: 700; color: #6b7280; padding-bottom: 0.5rem; text-transform: uppercase; }
+    .cal-day { height: 38px; display: flex; align-items: center; justify-content: center; border-radius: 8px; font-weight: 700; font-size: 0.85rem; background: #f9fafb; color: #9ca3af; cursor: pointer; transition: all 0.2s; }
+    .cal-day:hover:not(.empty) { background: #eef2ff; color: #4f46e5; }
+    .cal-day.empty { visibility: hidden; }
+    .cal-day.selected { background: #6366f1; color: #ffffff; }
+  </style>
+</head>
+<body ng-controller="ManualCtrl">
+
+  <aside class="sidebar">
+    <a href="dashboard.html" class="sidebar-logo"><i class="fas fa-layer-group"></i> Teacher's Dashboard</a>
+    <nav class="nav-menu">
+      <a href="dashboard.html" class="nav-item"><i class="fas fa-chart-pie"></i> Home</a>
+      <a href="students.html" class="nav-item"><i class="fas fa-address-book"></i> Student list</a>
+      <a href="attendance.html" class="nav-item"><i class="fas fa-expand-arrows-alt"></i> Face Attendance</a>
+      <a href="manual-attendance.html" class="nav-item active"><i class="fas fa-tasks"></i> Manual Attendance</a>
+
+      <a href="email.html" class="nav-item"><i class="fas fa-satellite-dish"></i> Smart Alerts</a>
+    </nav>
+    <div style="position: absolute; bottom: 2rem; left: 1rem;">
+      <a href="#" ng-click="logout()" class="nav-item" style="color: #cbd5e1 !important; text-decoration: none; display: flex; align-items: center;">
+        <i class="fas fa-sign-out-alt" style="margin-right: 0.75rem;"></i> Logout
+      </a>
+    </div>
+  </aside>
+
+  <main class="main-wrapper">
+    <div class="page-header" style="margin-bottom: 2.5rem;">
+      <div>
+        <h1 class="page-title">Manual Attendance</h1>
+        <p class="page-subtitle">Take Manual attendance and edit attendance section</p>
+      </div>
+    </div>
+
+    <!-- Session Sync Box -->
+    <div class="content-box" style="overflow: visible !important;">
+      <div class="box-header">
+        <div class="box-title">ATTENDANCE CONFIGURATION</div>
+        <button class="btn btn-primary" style="height: 38px;" ng-click="loadStudents()">
+            <i class="fas fa-sync-alt" style="margin-right: 0.5rem;"></i> Fetch Historical data
+        </button>
+      </div>
+      <div style="padding: 1.5rem;">
+        <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 1.5rem;">
+          <div class="form-group" style="margin: 0;">
+            <label>Select Subject</label>
+            <select ng-model="config.subject_id" class="form-control" ng-options="s.subject_id as s.name for s in subjects" style="color: #111827 !important; background: #ffffff !important;">
+                <option value="" disabled selected>-- Select a Subject --</option>
+            </select>
+          </div>
+          <div class="form-group datepicker-container" style="margin: 0;">
+            <label>Select Date</label>
+            <div class="datepicker-input" ng-click="showDatePicker = !showDatePicker">
+                <span>{{config.date | date:'dd/MM/yyyy'}}</span>
+                <i class="fas fa-calendar-alt" style="color: #6b7280;"></i>
+            </div>
+            
+            <div class="datepicker-dropdown" ng-show="showDatePicker">
+                <div class="cal-header">
+                    <button type="button" class="cal-btn" ng-click="prevMonth()"><i class="fas fa-chevron-left"></i></button>
+                    <div class="cal-month">{{monthNames[currentMonth]}} {{currentYear}}</div>
+                    <button type="button" class="cal-btn" ng-click="nextMonth()"><i class="fas fa-chevron-right"></i></button>
+                </div>
+                <div class="cal-grid">
+                    <div class="cal-day-header" ng-repeat="day in ['Su','Mo','Tu','We','Th','Fr','Sa']">{{day}}</div>
+                    <div class="cal-day empty" ng-repeat="e in emptyDays track by $index"></div>
+                    
+                    <div class="cal-day" ng-repeat="d in daysInMonth track by $index"
+                         ng-class="{'selected': isSelectedDate(d)}"
+                         ng-click="selectDate(d)">
+                         {{d}}
+                    </div>
+                </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Attendance Kanban Box -->
+    <div class="content-box" ng-if="studentList.length > 0">
+      <div class="box-header">
+        <div class="box-title">STUDENT ROSTER</div>
+        <button class="btn btn-success" style="padding: 0.4rem 1.5rem; border-radius: 8px; font-size: 0.85rem;" ng-click="saveAttendance()" ng-disabled="loading">
+          <i class="fas fa-cloud-upload-alt" style="margin-right: 0.3rem;"></i> {{loading ? 'Uploading...' : 'Submit'}}
+        </button>
+      </div>
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>ID TAG</th>
+              <th>NAME</th>
+              <th style="text-align: right;">STATUS DESIGNATION</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr ng-repeat="s in studentList">
+              <td style="color: var(--primary); font-weight: 600;">{{s.enrollment}}</td>
+              <td style="font-weight: 600;">{{s.name}}</td>
+              <td style="text-align: right;">
+                <div style="display: inline-flex; background: rgba(0,0,0,0.2); border-radius: 8px; padding: 4px; border: 1px solid var(--glass-border);">
+                  <button class="btn" style="padding: 0.3rem 1.5rem; font-size: 0.75rem; border-radius: 4px;" 
+                          ng-class="s.status === 'Present' ? 'btn-success' : 'btn-outline'" 
+                          ng-style="s.status === 'Present' ? {} : {'border': 'none'}"
+                          ng-click="s.status = 'Present'">Present</button>
+                  <button class="btn" style="padding: 0.3rem 1.5rem; font-size: 0.75rem; border-radius: 4px;" 
+                          ng-class="s.status === 'Absent' ? 'btn-danger' : 'btn-outline'" 
+                          ng-style="s.status === 'Absent' ? {} : {'border': 'none'}"
+                          ng-click="s.status = 'Absent'">Absent</button>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    angular.module('teacherApp', [])
+    .controller('ManualCtrl', function($scope, $http, $window, $filter) {
+      const token = $window.localStorage.getItem('teacherToken');
+      if (!token) $window.location.href = 'login.html'; 
+      $http.defaults.headers.common['Authorization'] = 'Bearer ' + token;
+
+      $scope.logout = () => { 
+        $window.localStorage.removeItem('teacherToken'); 
+        $window.localStorage.removeItem('teacherName');
+        $window.location.href = 'login.html'; 
+      };
+
+      $scope.config = { date: new Date() };
+      $scope.studentList = [];
+      
+      // Calendar logic
+      $scope.showDatePicker = false;
+      $scope.monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+      
+      const updateCalView = () => {
+          let cd = new Date($scope.config.date);
+          $scope.currentMonth = cd.getMonth();
+          $scope.currentYear = cd.getFullYear();
+          $scope.buildCalendar();
+      };
+
+      $scope.buildCalendar = () => {
+        const firstDay = new Date($scope.currentYear, $scope.currentMonth, 1).getDay();
+        const daysInMonth = new Date($scope.currentYear, $scope.currentMonth + 1, 0).getDate();
+        $scope.emptyDays = Array.from({length: firstDay}, () => null);
+        $scope.daysInMonth = Array.from({length: daysInMonth}, (_, i) => i + 1);
+      };
+
+      $scope.prevMonth = () => {
+        if ($scope.currentMonth === 0) { $scope.currentMonth = 11; $scope.currentYear--; } else { $scope.currentMonth--; }
+        $scope.buildCalendar();
+      };
+
+      $scope.nextMonth = () => {
+        if ($scope.currentMonth === 11) { $scope.currentMonth = 0; $scope.currentYear++; } else { $scope.currentMonth++; }
+        $scope.buildCalendar();
+      };
+
+      $scope.isSelectedDate = (d) => {
+          let cd = new Date($scope.config.date);
+          return cd.getDate() === d && cd.getMonth() === $scope.currentMonth && cd.getFullYear() === $scope.currentYear;
+      };
+
+      $scope.selectDate = (d) => {
+          $scope.config.date = new Date($scope.currentYear, $scope.currentMonth, d);
+          $scope.showDatePicker = false;
+      };
+
+      updateCalView();
+      
+      $http.get('/api/teacher/subjects').then(res => $scope.subjects = res.data.data);
+
+      $scope.loadStudents = () => { 
+        if(!$scope.config.subject_id) return;
+        const d = $filter('date')($scope.config.date, 'yyyy-MM-dd');
+        
+        // First get all students
+        $http.get('/api/teacher/students').then(res => {
+          let students = res.data.data;
+          
+          // Then check for existing attendance
+          $http.get('/api/teacher/attendance/fetch', { params: { subject_id: $scope.config.subject_id, date: d } })
+            .then(attrRes => {
+              const existing = attrRes.data.data;
+              $scope.studentList = students.map(s => {
+                const record = existing.find(a => a.enrollment === s.enrollment);
+                return { ...s, status: record ? record.status : 'Present' };
+              });
+            });
+        }); 
+      };
+
+      $scope.saveAttendance = () => {
+        $scope.loading = true;
+        const d = $filter('date')($scope.config.date, 'yyyy-MM-dd');
+        
+        const list = $scope.studentList.map(s => ({ enrollment: s.enrollment, status: s.status }));
+            
+        $http.post('/api/teacher/attendance/manual', { subject_id: $scope.config.subject_id, date: d, attendance_array: list })
+          .then(() => { alert("Attendance Successfully Submitted."); })
+          .finally(() => $scope.loading = false);
+      };
+    });
+  </script>
+</body>
+</html>

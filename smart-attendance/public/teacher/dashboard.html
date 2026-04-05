@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en" ng-app="teacherApp">
+<head>
+  <meta charset="UTF-8">
+  <title>System Dashboard | FleetFlow Platform</title>
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.8.2/angular.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    .datepicker-container { position: relative; }
+    .datepicker-input { 
+        border: none; background: #94a3b8; color: white; padding: 0.6rem 1rem; border-radius: 8px; 
+        font-weight: 800; font-size: 1.15rem; outline: none; cursor: pointer; display: flex; align-items: center; gap: 0.5rem;
+    }
+    .datepicker-dropdown {
+        position: absolute; top: calc(100% + 15px); right: 0; background: #ffffff;
+        border-radius: 12px; box-shadow: 0 10px 40px -10px rgba(0,0,0,0.15);
+        border: 1px solid #f3f4f6; width: 320px; padding: 1.5rem; z-index: 1000;
+    }
+    .cal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
+    .cal-btn { background: #f3f4f6; border: none; border-radius: 8px; width: 32px; height: 32px; color: #4b5563; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background 0.2s; }
+    .cal-btn:hover { background: #e5e7eb; color: #111827; }
+    .cal-month { font-size: 1.05rem; font-weight: 800; color: #111827; text-align: center; }
+    .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+    .cal-day-header { text-align: center; font-size: 0.75rem; font-weight: 700; color: #6b7280; padding-bottom: 0.5rem; text-transform: uppercase; }
+    .cal-day { height: 38px; display: flex; align-items: center; justify-content: center; border-radius: 8px; font-weight: 700; font-size: 0.85rem; background: #f9fafb; color: #9ca3af; cursor: pointer; transition: all 0.2s; }
+    .cal-day:hover:not(.empty) { background: #eef2ff; color: #4f46e5; }
+    .cal-day.empty { visibility: hidden; }
+    .cal-day.selected { background: #6366f1; color: #ffffff; }
+  </style>
+</head>
+<body ng-controller="DashboardCtrl">
+
+  <aside class="sidebar">
+    <a href="dashboard.html" class="sidebar-logo"><i class="fas fa-layer-group"></i> Teacher's Dashboard</a>
+    <nav class="nav-menu">
+      <a href="dashboard.html" class="nav-item active"><i class="fas fa-chart-pie"></i> Home</a>
+      <a href="students.html" class="nav-item"><i class="fas fa-address-book"></i> Student list</a>
+      <a href="attendance.html" class="nav-item"><i class="fas fa-expand-arrows-alt"></i> Face Attendance</a>
+      <a href="manual-attendance.html" class="nav-item"><i class="fas fa-tasks"></i> Manual Attendance</a>
+      <a href="email.html" class="nav-item"><i class="fas fa-satellite-dish"></i> Smart Alerts</a>
+    </nav>
+    <div style="position: absolute; bottom: 2rem; left: 1rem;">
+      <a href="#" ng-click="logout()" class="nav-item" style="color: #cbd5e1 !important; text-decoration: none; display: flex; align-items: center;">
+        <i class="fas fa-sign-out-alt" style="margin-right: 0.75rem;"></i> Logout
+      </a>
+    </div>
+  </aside>
+
+  <main class="main-wrapper">
+    <!-- Header aligned with photo -->
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2.5rem;">
+      <div>
+        <h1 class="page-title">Welcome back, Admin</h1>
+        <p class="page-subtitle">Monitor your classes and student attendance performance.</p>
+      </div>
+      <div>
+        <div class="datepicker-container" style="background: white; border: 1px solid #e5e7eb; border-radius: 9999px; padding: 1rem 2rem; display: flex; align-items: center; gap: 1rem; box-shadow: 0 6px 15px rgba(0,0,0,0.04);">
+            <i class="fas fa-calendar-alt" style="color: #6366f1; font-size: 1.75rem;"></i>
+            <span style="font-weight: 800; font-size: 1.25rem; color: #111827;">View Status For:</span>
+            
+            <div class="datepicker-input" ng-click="showDatePicker = !showDatePicker">
+                <span>{{selectedDate | date:'dd/MM/yyyy'}}</span>
+            </div>
+            
+            <div class="datepicker-dropdown" ng-show="showDatePicker">
+                <div class="cal-header">
+                    <button type="button" class="cal-btn" ng-click="prevMonth()"><i class="fas fa-chevron-left"></i></button>
+                    <div class="cal-month">{{monthNames[currentMonth]}} {{currentYear}}</div>
+                    <button type="button" class="cal-btn" ng-click="nextMonth()"><i class="fas fa-chevron-right"></i></button>
+                </div>
+                <div class="cal-grid">
+                    <div class="cal-day-header" ng-repeat="day in ['Su','Mo','Tu','We','Th','Fr','Sa']">{{day}}</div>
+                    <div class="cal-day empty" ng-repeat="e in emptyDays track by $index"></div>
+                    
+                    <div class="cal-day" ng-repeat="d in daysInMonth track by $index"
+                         ng-class="{'selected': isSelectedDate(d)}"
+                         ng-click="selectDate(d)">
+                         {{d}}
+                    </div>
+                </div>
+            </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3 KPI Cards -->
+    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; margin-bottom: 2.5rem;">
+      <!-- Card 1 -->
+      <div style="background: white; border-radius: 16px; padding: 2rem; text-align: center; box-shadow: 0 4px 15px rgba(0,0,0,0.03); border-bottom: 4px solid #6366f1;">
+        <div style="font-size: 3rem; font-weight: 800; color: #6366f1; line-height: 1; margin-bottom: 0.5rem;">{{stats.totalStudents || 0}}</div>
+        <div style="font-size: 0.75rem; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em;">REGISTERED STUDENTS</div>
+      </div>
+      <!-- Card 2 -->
+      <div style="background: white; border-radius: 16px; padding: 2rem; text-align: center; box-shadow: 0 4px 15px rgba(0,0,0,0.03); border-bottom: 4px solid #10b981;">
+        <div style="font-size: 3rem; font-weight: 800; color: #10b981; line-height: 1; margin-bottom: 0.5rem;">{{stats.todayPresent || 0}}</div>
+        <div style="font-size: 0.75rem; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em;">TOTAL PRESENT TODAY</div>
+      </div>
+      <!-- Card 3 -->
+      <div style="background: white; border-radius: 16px; padding: 2rem; text-align: center; box-shadow: 0 4px 15px rgba(0,0,0,0.03); border-bottom: 4px solid #ef4444;">
+        <div style="font-size: 3rem; font-weight: 800; color: #ef4444; line-height: 1; margin-bottom: 0.5rem;">{{stats.todayAbsent || 0}}</div>
+        <div style="font-size: 0.75rem; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em;">TOTAL ABSENT TODAY</div>
+      </div>
+    </div>
+
+    <!-- Main Table -->
+    <div style="background: white; border-radius: 16px; box-shadow: 0 4px 15px rgba(0,0,0,0.03); overflow: hidden;">
+        <div style="padding: 1.5rem 2rem; border-bottom: 1px solid #f3f4f6; display: flex; justify-content: space-between; align-items: center;">
+            <div style="font-size: 0.85rem; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em;">SUBJECT WISE PARTICIPATION</div>
+            <div style="background: #f0fdf4; color: #16a34a; padding: 0.35rem 0.85rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 700;">Live Class Status</div>
+        </div>
+        
+        <table style="width: 100%; border-collapse: collapse;">
+            <thead>
+                <tr>
+                    <th style="text-align: left; padding: 1rem 2rem; font-size: 0.75rem; font-weight: 800; color: #111827; background: #f9fafb; border-bottom: 1px solid #f3f4f6;">SUBJECT NAME</th>
+                    <th style="text-align: center; padding: 1rem 2rem; font-size: 0.75rem; font-weight: 800; color: #111827; background: #f9fafb; border-bottom: 1px solid #f3f4f6;">PRESENT</th>
+                    <th style="text-align: center; padding: 1rem 2rem; font-size: 0.75rem; font-weight: 800; color: #111827; background: #f9fafb; border-bottom: 1px solid #f3f4f6;">ABSENT</th>
+                    <th style="text-align: center; padding: 1rem 2rem; font-size: 0.75rem; font-weight: 800; color: #111827; background: #f9fafb; border-bottom: 1px solid #f3f4f6;">ACTION</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr ng-repeat="sub in stats.subjectBreakdown">
+                    <td style="padding: 1.5rem 2rem; font-size: 0.95rem; font-weight: 700; color: #1e293b; border-bottom: 1px solid #f3f4f6; text-transform: uppercase;">{{sub.name}}</td>
+                    <td style="text-align: center; padding: 1.5rem 2rem; font-size: 1.1rem; font-weight: 800; color: #10b981; border-bottom: 1px solid #f3f4f6;">{{sub.present}}</td>
+                    <td style="text-align: center; padding: 1.5rem 2rem; font-size: 1.1rem; font-weight: 800; color: #ef4444; border-bottom: 1px solid #f3f4f6;">{{sub.absent}}</td>
+                    <td style="text-align: center; padding: 1.5rem 2rem; border-bottom: 1px solid #f3f4f6;">
+                        <button style="background: white; border: 1px solid #e5e7eb; border-radius: 8px; width: 42px; height: 42px; display: inline-flex; justify-content: center; align-items: center; cursor: pointer; color: #6b7280; transition: all 0.2s;" title="Edit Status" ng-click="editAction(sub)">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                    </td>
+                </tr>
+                <tr ng-if="!stats.subjectBreakdown || stats.subjectBreakdown.length === 0">
+                    <td colspan="4" style="text-align: center; padding: 3rem; color: #9ca3af;">No class data found for this date.</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+  </main>
+
+  <script>
+    angular.module('teacherApp', [])
+    .controller('DashboardCtrl', function($scope, $http, $window, $filter, $timeout) {
+      const token = $window.localStorage.getItem('teacherToken');
+      if (!token) $window.location.href = 'login.html';
+      $http.defaults.headers.common['Authorization'] = 'Bearer ' + token;
+      
+      $scope.teacherName = $window.localStorage.getItem('teacherName') || 'Admin';
+      $scope.selectedDate = new Date();
+
+      $scope.editAction = (sub) => {
+          $window.location.href = 'manual-attendance.html';
+      };
+
+      // Custom Calendar Logic
+      $scope.showDatePicker = false;
+      $scope.monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+      
+      const updateCalView = () => {
+          let cd = new Date($scope.selectedDate);
+          $scope.currentMonth = cd.getMonth();
+          $scope.currentYear = cd.getFullYear();
+          $scope.buildCalendar();
+      };
+
+      $scope.buildCalendar = () => {
+        const firstDay = new Date($scope.currentYear, $scope.currentMonth, 1).getDay();
+        const daysInMonth = new Date($scope.currentYear, $scope.currentMonth + 1, 0).getDate();
+        $scope.emptyDays = Array.from({length: firstDay}, () => null);
+        $scope.daysInMonth = Array.from({length: daysInMonth}, (_, i) => i + 1);
+      };
+
+      $scope.prevMonth = () => {
+        if ($scope.currentMonth === 0) { $scope.currentMonth = 11; $scope.currentYear--; } else { $scope.currentMonth--; }
+        $scope.buildCalendar();
+      };
+
+      $scope.nextMonth = () => {
+        if ($scope.currentMonth === 11) { $scope.currentMonth = 0; $scope.currentYear++; } else { $scope.currentMonth++; }
+        $scope.buildCalendar();
+      };
+
+      $scope.isSelectedDate = (d) => {
+          let cd = new Date($scope.selectedDate);
+          return cd.getDate() === d && cd.getMonth() === $scope.currentMonth && cd.getFullYear() === $scope.currentYear;
+      };
+
+      $scope.selectDate = (d) => {
+          $scope.selectedDate = new Date($scope.currentYear, $scope.currentMonth, d);
+          $scope.showDatePicker = false;
+          $scope.loadDashboard();
+      };
+
+      updateCalView();
+
+      $scope.loadDashboard = () => {
+        const d = $filter('date')($scope.selectedDate, 'yyyy-MM-dd');
+        $http.get('/api/teacher/stats?date=' + d).then(res => {
+          $scope.stats = res.data.data;
+        });
+      };
+      
+      $scope.logout = () => { 
+        $window.localStorage.removeItem('teacherToken'); 
+        $window.localStorage.removeItem('teacherName');
+        $window.location.href = 'login.html'; 
+      };
+      
+      // Load initially
+      $timeout($scope.loadDashboard, 100);
+    });
+  </script>
+</body>
+</html>

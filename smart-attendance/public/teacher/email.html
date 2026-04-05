@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en" ng-app="teacherApp">
+<head>
+  <meta charset="UTF-8">
+  <title>Smart Alerts | FleetFlow Platform</title>
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.8.2/angular.min.js"></script>
+  <style>
+    /* Custom Datepicker */
+    .datepicker-container { position: relative; }
+    .datepicker-input { 
+        background: #ffffff; border: 1px solid var(--glass-border); color: #111827;
+        padding: 0.85rem 1.25rem; border-radius: 8px; width: 100%; cursor: pointer;
+        font-size: 0.95rem; display: flex; justify-content: space-between; align-items: center;
+    }
+    .datepicker-dropdown {
+        position: absolute; top: calc(100% + 5px); left: 0; background: #ffffff;
+        border-radius: 12px; box-shadow: 0 10px 40px -10px rgba(0,0,0,0.15);
+        border: 1px solid #f3f4f6; width: 320px; padding: 1.5rem; z-index: 1000;
+    }
+    .cal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+    .cal-month { font-weight: 700; color: #1e293b; }
+    .cal-btn { background: none; border: none; cursor: pointer; color: #64748b; padding: 5px; }
+    .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+    .cal-day-head { text-align: center; font-size: 0.7rem; font-weight: 700; color: #94a3b8; padding-bottom: 5px; }
+    .cal-day { 
+        aspect-ratio: 1; display: flex; align-items: center; justify-content: center;
+        font-size: 0.85rem; cursor: pointer; border-radius: 6px; color: #475569;
+    }
+    .cal-day:hover { background: #f1f5f9; color: #6366f1; }
+    .cal-day.selected { background: #6366f1; color: white; font-weight: 700; }
+    .cal-day.empty { cursor: default; }
+    .cal-day.empty:hover { background: none; }
+  </style>
+</head>
+<body ng-controller="EmailCtrl">
+
+  <aside class="sidebar">
+    <a href="dashboard.html" class="sidebar-logo"><i class="fas fa-layer-group"></i> Teacher's Dashboard</a>
+    <nav class="nav-menu">
+      <a href="dashboard.html" class="nav-item"><i class="fas fa-chart-pie"></i> Home</a>
+      <a href="students.html" class="nav-item"><i class="fas fa-address-book"></i> Student list</a>
+      <a href="attendance.html" class="nav-item"><i class="fas fa-expand-arrows-alt"></i> Face Attendance</a>
+      <a href="manual-attendance.html" class="nav-item"><i class="fas fa-tasks"></i> Manual Attendance</a>
+
+      <a href="email.html" class="nav-item active"><i class="fas fa-satellite-dish"></i> Smart Alerts</a>
+    </nav>
+    <div style="position: absolute; bottom: 2rem; left: 1rem;">
+      <a href="#" ng-click="logout()" class="nav-item" style="color: #cbd5e1 !important; text-decoration: none; display: flex; align-items: center;">
+        <i class="fas fa-sign-out-alt" style="margin-right: 0.75rem;"></i> Logout
+      </a>
+    </div>
+  </aside>
+
+  <main class="main-wrapper">
+    <div class="page-header" style="margin-bottom: 2.5rem;">
+      <div>
+        <h1 class="page-title">Email Alerts</h1>
+        <p class="page-subtitle">Send automated alerts for absences.</p>
+      </div>
+    </div>
+
+    <div class="content-box" style="overflow: visible !important;">
+      <div class="box-header">
+        <div class="box-title">ALERT CONFIGURATION</div>
+        <div class="badge badge-red" ng-if="absentees.length > 0">{{absentees.length}} Absences Student Identified</div>
+      </div>
+      <div style="padding: 1.5rem;">
+        <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 1.5rem;">
+          <div class="form-group" style="margin: 0;">
+            <label>Select Subject</label>
+            <select ng-model="config.subject_id" class="form-control" ng-options="s.subject_id as s.name for s in subjects" ng-change="previewAbsentees()" style="color: #111827 !important;">
+                <option value="" disabled selected>-- Select a Subject --</option>
+            </select>
+          </div>
+          <div class="form-group datepicker-container" style="margin: 0;">
+            <label>Select Date</label>
+            <div class="datepicker-input" ng-click="showDatePicker = !showDatePicker">
+                <span>{{config.date | date:'dd/MM/yyyy'}}</span>
+                <i class="fas fa-calendar-alt" style="color: #6b7280;"></i>
+            </div>
+            
+            <div class="datepicker-dropdown" ng-show="showDatePicker">
+                <div class="cal-header">
+                    <button type="button" class="cal-btn" ng-click="prevMonth()"><i class="fas fa-chevron-left"></i></button>
+                    <div class="cal-month">{{monthNames[currentMonth]}} {{currentYear}}</div>
+                    <button type="button" class="cal-btn" ng-click="nextMonth()"><i class="fas fa-chevron-right"></i></button>
+                </div>
+                <div class="cal-grid">
+                    <div class="cal-day-head" ng-repeat="d in ['Su','Mo','Tu','We','Th','Fr','Sa']">{{d}}</div>
+                    <div class="cal-day empty" ng-repeat="e in emptyDays track by $index"></div>
+                    <div class="cal-day" ng-repeat="d in daysInMonth" 
+                         ng-class="{'selected': isSelected(d)}"
+                         ng-click="selectDate(d)">{{d}}</div>
+                </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="content-box">
+      <div class="box-header">
+        <div class="box-title">STUDENT ROSTER</div>
+        <button class="btn btn-danger" style="padding: 0.4rem 1rem; border-radius: 8px; font-size: 0.85rem;" ng-click="sendAlerts()" ng-disabled="loading || absentees.length === 0">
+          <i class="fas fa-paper-plane" style="margin-right: 0.3rem;"></i> {{loading ? 'Transmitting...' : 'Send Alerts'}}
+        </button>
+      </div>
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>ENROLLMENT ID</th>
+              <th>STUDENT NAME</th>
+              <th>EMAIL ADDRESS</th>
+              <th style="text-align: right;">STATUS</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr ng-repeat="a in absentees">
+              <td style="color: var(--primary); font-weight: 600;">{{a.enrollment}}</td>
+              <td style="font-weight: 600; color: var(--text-main);">{{a.student_name}}</td>
+              <td style="color: var(--text-muted);"><i class="fas fa-envelope" style="margin-right: 0.3rem;"></i> {{a.email || 'N/A'}}</td>
+              <td style="text-align: right;"><span class="badge badge-red">ABSENT</span></td>
+            </tr>
+            <tr ng-if="absentees.length === 0">
+              <td colspan="4" style="text-align: center; color: var(--text-muted); padding: 3rem;">
+                <i class="fas fa-satellite" style="font-size: 2rem; opacity: 0.3; margin-bottom: 1rem;"></i>
+                <p>No absences detected for selected parameters.</p>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    angular.module('teacherApp', [])
+    .controller('EmailCtrl', function($scope, $http, $window, $filter) {
+      const token = $window.localStorage.getItem('teacherToken');
+      if (!token) { $window.location.href = 'login.html'; return; }
+      $http.defaults.headers.common['Authorization'] = 'Bearer ' + token;
+
+      $scope.logout = () => { 
+        $window.localStorage.removeItem('teacherToken'); 
+        $window.localStorage.removeItem('teacherName');
+        $window.location.href = 'login.html'; 
+      };
+
+      $scope.config = { date: new Date() };
+      $scope.absentees = [];
+      
+      $http.get('/api/teacher/subjects').then(res => {
+        $scope.subjects = res.data.data;
+        if($scope.subjects.length > 0) {
+           // Optionally auto-select first subject
+        }
+      });
+
+      // Calendar Logic
+      $scope.showDatePicker = false;
+      $scope.monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+      $scope.currentMonth = $scope.config.date.getMonth();
+      $scope.currentYear = $scope.config.date.getFullYear();
+
+      $scope.buildCalendar = () => {
+        const firstDay = new Date($scope.currentYear, $scope.currentMonth, 1).getDay();
+        const daysInMonth = new Date($scope.currentYear, $scope.currentMonth + 1, 0).getDate();
+        
+        $scope.emptyDays = Array.from({length: firstDay});
+        $scope.daysInMonth = Array.from({length: daysInMonth}, (_, i) => i + 1);
+      };
+
+      $scope.prevMonth = () => {
+        $scope.currentMonth--;
+        if ($scope.currentMonth < 0) { $scope.currentMonth = 11; $scope.currentYear--; }
+        $scope.buildCalendar();
+      };
+
+      $scope.nextMonth = () => {
+        $scope.currentMonth++;
+        if ($scope.currentMonth > 11) { $scope.currentMonth = 0; $scope.currentYear++; }
+        $scope.buildCalendar();
+      };
+
+      $scope.isSelected = (day) => {
+        return $scope.config.date.getDate() == day && 
+               $scope.config.date.getMonth() == $scope.currentMonth && 
+               $scope.config.date.getFullYear() == $scope.currentYear;
+      };
+
+      $scope.selectDate = (day) => {
+        $scope.config.date = new Date($scope.currentYear, $scope.currentMonth, day);
+        $scope.showDatePicker = false;
+        $scope.previewAbsentees(); // Trigger preview after selecting date
+      };
+
+      $scope.buildCalendar();
+
+      $scope.previewAbsentees = () => {
+        if (!$scope.config.subject_id || !$scope.config.date) return;
+        const d = $filter('date')($scope.config.date, 'yyyy-MM-dd');
+        $http.get('/api/teacher/daily-attendance', { params: { subject_id: $scope.config.subject_id, date: d } })
+          .then(res => $scope.absentees = res.data.data);
+      };
+
+      $scope.sendAlerts = () => {
+        $scope.loading = true;
+        const d = $filter('date')($scope.config.date, 'yyyy-MM-dd');
+        $http.post('/api/teacher/email/send', { subject_id: $scope.config.subject_id, date: d })
+          .then(res => alert("Alerts Sent Successfully!"))
+          .catch(err => alert("Transmission Error: " + (err.data ? err.data.message : "Server Error")))
+          .finally(() => $scope.loading = false);
+      };
+    });
+  </script>
+</body>
+</html>
